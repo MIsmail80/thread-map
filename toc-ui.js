@@ -494,7 +494,10 @@ function _buildPanel() {
     // Empty state
     emptyStateElement = document.createElement('div');
     emptyStateElement.className = 'toc-empty';
-    emptyStateElement.textContent = 'No user messages yet.';
+    emptyStateElement.innerHTML = `
+        <strong>Start asking ChatGPT something.</strong><br>
+        Your prompts will appear here.
+    `;
 
     // Search no-results state (separate from empty state)
     searchNoResultsElement = document.createElement('div');

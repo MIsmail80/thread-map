@@ -535,11 +535,19 @@
    ────────────────────────────────────────────── */
 
 .toc-empty {
-  padding: 32px 16px;
+  padding: 40px 16px;
   text-align: center;
   color: var(--toc-text-secondary);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+
+.toc-empty strong {
+  display: block;
+  font-size: 14px;
+  color: var(--toc-text);
+  margin-bottom: 4px;
+  font-weight: 600;
 }
 
 /* ──────────────────────────────────────────────
