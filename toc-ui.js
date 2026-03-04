@@ -20,9 +20,6 @@ const HIGHLIGHT_DURATION_MS = 2000;
 /** CSS class applied to host element for dark theme */
 const DARK_THEME_CLASS = 'dark-theme';
 
-/** Interval (ms) to check for theme changes on the host page */
-const THEME_CHECK_INTERVAL_MS = 1000;
-
 /**
  * Pre-resolve the styles.css URL at script load time.
  * chrome.runtime is guaranteed valid when the script first executes,
@@ -72,8 +69,8 @@ let emptyStateElement = null;
 /** @type {HTMLElement|null} */
 let listContainerElement = null;
 
-/** @type {number|null} */
-let themeCheckTimer = null;
+/** @type {MutationObserver|null} Observer for html theme attributes */
+let themeObserver = null;
 
 /** @type {HTMLElement|null} Currently highlighted message element */
 let currentHighlight = null;
@@ -159,7 +156,21 @@ function createPanel() {
 
     // Start theme detection
     _detectTheme();
-    themeCheckTimer = setInterval(_detectTheme, THEME_CHECK_INTERVAL_MS);
+    if (!themeObserver) {
+        themeObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'attributes' &&
+                    (mutation.attributeName === 'class' || mutation.attributeName === 'data-theme')) {
+                    _detectTheme();
+                    break;
+                }
+            }
+        });
+        themeObserver.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class', 'data-theme']
+        });
+    }
 
     // Auto-open panel if setting is enabled
     if (getSetting('autoOpenPanel')) {
@@ -177,9 +188,9 @@ function createPanel() {
  * Completely removes the TOC panel from the page and cleans up.
  */
 function destroyPanel() {
-    if (themeCheckTimer) {
-        clearInterval(themeCheckTimer);
-        themeCheckTimer = null;
+    if (themeObserver) {
+        themeObserver.disconnect();
+        themeObserver = null;
     }
 
     if (highlightTimer) {
