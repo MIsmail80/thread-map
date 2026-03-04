@@ -237,6 +237,15 @@
   text-transform: uppercase;
 }
 
+.toc-version {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--toc-text-secondary);
+  background: var(--toc-hover-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 .toc-close-btn {
   width: 28px;
   height: 28px;
@@ -664,6 +673,22 @@
 .toc-settings-body::-webkit-scrollbar-thumb {
   background: var(--toc-scrollbar-thumb);
   border-radius: 3px;
+}
+
+.toc-settings-footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 11px;
+  color: var(--toc-text-secondary);
+  border-top: 1px solid var(--toc-border);
+  flex-shrink: 0;
+}
+
+.toc-settings-footer code {
+  background: var(--toc-hover-bg);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: inherit;
 }
 
 /* ──────────────────────────────────────────────

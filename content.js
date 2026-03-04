@@ -124,11 +124,18 @@ function _tryInit(attempt) {
     }
 
     // Check if the conversation container has rendered
-    const hasMessages = document.querySelector('[data-message-author-role]');
+    const messageElement = document.querySelector('[data-message-author-role]');
 
-    if (!hasMessages && attempt < MAX_INIT_RETRIES) {
+    if (!messageElement && attempt < MAX_INIT_RETRIES) {
         // Messages haven't loaded yet — retry after a short delay
         setTimeout(() => _tryInit(attempt + 1), RETRY_INTERVAL_MS);
+        return;
+    }
+
+    if (!messageElement) {
+        // Fallback guard to detect DOM breakage instead of silently failing
+        console.warn("ThreadMap: message structure changed");
+        console.warn("ThreadMap: ChatGPT DOM version change detected");
         return;
     }
 

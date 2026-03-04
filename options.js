@@ -43,6 +43,17 @@ function init() {
             const el = document.getElementById(`setting-${key}`);
             if (el) el.value = String(settings[key]);
         }
+
+        // Show version
+        const versionEl = document.getElementById('version-display');
+        if (versionEl) {
+            try {
+                const manifest = chrome.runtime.getManifest();
+                versionEl.textContent = 'Thread Map v' + manifest.version;
+            } catch (e) {
+                versionEl.textContent = 'Thread Map v1.0.0';
+            }
+        }
     });
 }
 

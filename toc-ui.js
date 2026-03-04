@@ -339,6 +339,17 @@ function _buildPanel() {
 
     brandContainer.appendChild(title);
 
+    // Version badge
+    const versionBadge = document.createElement('span');
+    versionBadge.className = 'toc-version';
+    try {
+        const manifest = chrome.runtime.getManifest();
+        versionBadge.textContent = 'v' + manifest.version;
+    } catch (e) {
+        versionBadge.textContent = 'v1.0.0';
+    }
+    brandContainer.appendChild(versionBadge);
+
     // Header action buttons container
     const headerActions = document.createElement('div');
     headerActions.className = 'toc-header-actions';
@@ -645,10 +656,13 @@ function _createTOCItem(item, number) {
 /**
  * Smoothly scrolls to a message element and temporarily highlights it.
  *
- * @param {HTMLElement} element — The message container to scroll to.
+ * @param {HTMLElement} messageElement — The message container to scroll to.
  */
-function _scrollToMessage(element) {
-    if (!element || !document.contains(element)) return;
+function _scrollToMessage(messageElement) {
+    if (!messageElement || !document.contains(messageElement)) {
+        console.warn("ThreadMap: message structure changed");
+        return;
+    }
 
     // Remove any active highlight first
     if (currentHighlight) {
@@ -656,15 +670,15 @@ function _scrollToMessage(element) {
     }
 
     // Smooth scroll into the center of the viewport
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     // Skip highlight animation if setting is off
     if (!getSetting('highlightOnScroll')) return;
 
     // Apply highlight animation
-    element.style.animation = `toc-highlight-fade ${HIGHLIGHT_DURATION_MS}ms ease-out`;
-    element.style.borderRadius = '8px';
-    currentHighlight = element;
+    messageElement.style.animation = `toc-highlight-fade ${HIGHLIGHT_DURATION_MS}ms ease-out`;
+    messageElement.style.borderRadius = '8px';
+    currentHighlight = messageElement;
 
     // Inject the keyframe animation into the host page if not already done
     _ensureHighlightStyles();
@@ -672,7 +686,7 @@ function _scrollToMessage(element) {
     // Remove highlight after animation completes
     if (highlightTimer) clearTimeout(highlightTimer);
     highlightTimer = setTimeout(() => {
-        _removeHighlight(element);
+        _removeHighlight(messageElement);
         currentHighlight = null;
     }, HIGHLIGHT_DURATION_MS);
 }
@@ -921,6 +935,23 @@ function _buildSettingsOverlay() {
     ));
 
     settingsOverlayElement.appendChild(body);
+
+    // Footer
+    const footer = document.createElement('div');
+    footer.className = 'toc-settings-footer';
+
+    let versionStr = 'v1.0.0';
+    try {
+        const manifest = chrome.runtime.getManifest();
+        versionStr = 'v' + manifest.version;
+    } catch (e) { }
+
+    footer.innerHTML = `
+        <strong>Pro Tip:</strong> Press <code>Alt + T</code> to toggle the Thread Map panel at any time.<br><br>
+        Changes save automatically<br><br>
+        <span style="opacity: 0.7; font-size: 10px;">Thread Map ${versionStr}</span>
+    `;
+    settingsOverlayElement.appendChild(footer);
 }
 
 /**
