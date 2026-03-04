@@ -70,6 +70,18 @@ let emptyStateElement = null;
 let listContainerElement = null;
 
 /** @type {HTMLElement|null} */
+let searchInputElement = null;
+
+/** @type {HTMLElement|null} */
+let searchContainerElement = null;
+
+/** @type {HTMLElement|null} */
+let searchNoResultsElement = null;
+
+/** @type {HTMLElement|null} */
+let searchClearBtnElement = null;
+
+/** @type {HTMLElement|null} */
 let progressIndicatorElement = null;
 
 /** @type {MutationObserver|null} Observer for html theme attributes */
@@ -239,6 +251,10 @@ function destroyPanel() {
     emptyStateElement = null;
     listContainerElement = null;
     progressIndicatorElement = null;
+    searchInputElement = null;
+    searchContainerElement = null;
+    searchNoResultsElement = null;
+    searchClearBtnElement = null;
     ltrBtnElement = null;
     rtlBtnElement = null;
     settingsOverlayElement = null;
@@ -449,6 +465,10 @@ function _buildPanel() {
     toolbar.appendChild(toolbarRight);
     panelElement.appendChild(toolbar);
 
+    // Search field
+    _buildSearchField();
+    panelElement.appendChild(searchContainerElement);
+
     // Scrollable list container
     listContainerElement = document.createElement('div');
     listContainerElement.className = 'toc-list-container';
@@ -476,9 +496,16 @@ function _buildPanel() {
     emptyStateElement.className = 'toc-empty';
     emptyStateElement.textContent = 'No user messages yet.';
 
+    // Search no-results state (separate from empty state)
+    searchNoResultsElement = document.createElement('div');
+    searchNoResultsElement.className = 'toc-search-no-results';
+    searchNoResultsElement.textContent = 'No matching prompts.';
+    searchNoResultsElement.style.display = 'none';
+
     listContainerElement.appendChild(sectionHeader);
     listContainerElement.appendChild(tocListElement);
     listContainerElement.appendChild(emptyStateElement);
+    listContainerElement.appendChild(searchNoResultsElement);
     panelElement.appendChild(listContainerElement);
 
     // Build settings overlay (hidden by default)
@@ -546,6 +573,105 @@ function _autoDetectDirection() {
 }
 
 // ──────────────────────────────────────────────
+// Search Field
+// ──────────────────────────────────────────────
+
+/** Builds the search input field */
+function _buildSearchField() {
+    searchContainerElement = document.createElement('div');
+    searchContainerElement.className = 'toc-search-container';
+
+    const searchIcon = document.createElement('span');
+    searchIcon.className = 'toc-search-icon';
+    searchIcon.textContent = '\uD83D\uDD0E'; // 🔎
+
+    searchInputElement = document.createElement('input');
+    searchInputElement.type = 'text';
+    searchInputElement.className = 'toc-search-input';
+    searchInputElement.placeholder = 'Search prompts...';
+    searchInputElement.setAttribute('aria-label', 'Search prompts');
+
+    searchClearBtnElement = document.createElement('button');
+    searchClearBtnElement.className = 'toc-search-clear-btn';
+    searchClearBtnElement.innerHTML = '&#x2715;';
+    searchClearBtnElement.setAttribute('aria-label', 'Clear search');
+    searchClearBtnElement.setAttribute('title', 'Clear');
+    searchClearBtnElement.style.display = 'none';
+
+    searchClearBtnElement.addEventListener('click', () => {
+        searchInputElement.value = '';
+        searchClearBtnElement.style.display = 'none';
+        _filterTOCItems('');
+        searchInputElement.focus();
+    });
+
+    searchInputElement.addEventListener('input', () => {
+        const query = searchInputElement.value;
+        searchClearBtnElement.style.display = query.length > 0 ? '' : 'none';
+        _filterTOCItems(query);
+    });
+
+    searchInputElement.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (searchInputElement.value.length > 0) {
+                searchInputElement.value = '';
+                searchClearBtnElement.style.display = 'none';
+                _filterTOCItems('');
+                e.stopPropagation();
+            }
+        }
+    });
+
+    searchContainerElement.appendChild(searchIcon);
+    searchContainerElement.appendChild(searchInputElement);
+    searchContainerElement.appendChild(searchClearBtnElement);
+}
+
+/**
+ * Filters TOC items based on a search query.
+ * Hides items whose label text doesn't match the query.
+ * @param {string} query — The search string.
+ */
+function _filterTOCItems(query) {
+    if (!tocListElement) return;
+
+    const normalizedQuery = query.trim().toLowerCase();
+    const items = tocListElement.querySelectorAll('.toc-item');
+    let visibleCount = 0;
+
+    items.forEach(item => {
+        const label = item.querySelector('.toc-item-label');
+        if (!label) return;
+
+        const text = label.textContent.toLowerCase();
+        if (normalizedQuery === '' || text.includes(normalizedQuery)) {
+            item.style.display = '';
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+
+    // Show/hide no-results message
+    if (searchNoResultsElement) {
+        if (normalizedQuery !== '' && visibleCount === 0) {
+            searchNoResultsElement.style.display = 'block';
+        } else {
+            searchNoResultsElement.style.display = 'none';
+        }
+    }
+}
+
+/**
+ * Clears the search field and resets filter state.
+ */
+function _clearSearch() {
+    if (searchInputElement) searchInputElement.value = '';
+    if (searchClearBtnElement) searchClearBtnElement.style.display = 'none';
+    if (searchNoResultsElement) searchNoResultsElement.style.display = 'none';
+}
+
+// ──────────────────────────────────────────────
 // Panel Open/Close
 // ──────────────────────────────────────────────
 
@@ -604,6 +730,9 @@ function renderTOC(items) {
 
     // Clear existing items
     tocListElement.innerHTML = '';
+
+    // Reset search filter
+    _clearSearch();
 
     // Reset scroll observer
     if (scrollObserver) {
@@ -687,6 +816,7 @@ function clearTOC() {
     currentlyIntersecting.clear();
 
     if (progressIndicatorElement) progressIndicatorElement.textContent = '';
+    _clearSearch();
     _showEmptyState();
 }
 
@@ -1257,6 +1387,7 @@ function _handleSettingChange(key, value) {
 function _openSettingsOverlay() {
     if (settingsOverlayElement) settingsOverlayElement.classList.add('open');
     if (listContainerElement) listContainerElement.style.display = 'none';
+    if (searchContainerElement) searchContainerElement.style.display = 'none';
 }
 
 /**
@@ -1265,4 +1396,5 @@ function _openSettingsOverlay() {
 function _closeSettingsOverlay() {
     if (settingsOverlayElement) settingsOverlayElement.classList.remove('open');
     if (listContainerElement) listContainerElement.style.display = '';
+    if (searchContainerElement) searchContainerElement.style.display = '';
 }
