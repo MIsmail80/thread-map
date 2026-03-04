@@ -72,21 +72,36 @@ function _isExtensionContextValid() {
 // ──────────────────────────────────────────────
 
 /**
- * Main entry point. Waits for the page to settle, then initializes
- * if we're on a conversation page.
+ * Main entry point. Loads settings, then waits for the page to settle
+ * and initializes if we're on a conversation page.
  */
 function main() {
     // Bail out if extension context was invalidated
     if (!_isExtensionContextValid()) return;
 
-    // Wait for ChatGPT to finish initial render
-    setTimeout(() => {
-        _tryInit(0);
-    }, INIT_DELAY_MS);
+    // Load settings first, then initialize
+    loadSettings().then(() => {
+        // Check if extension is enabled
+        if (!getSetting('enabled')) return;
+
+        // Wait for ChatGPT to finish initial render
+        setTimeout(() => {
+            _tryInit(0);
+        }, INIT_DELAY_MS);
+    });
 
     // Listen for SPA navigation events
     listenForNavigation(() => {
         _handleNavigation();
+    });
+
+    // Listen for live settings changes
+    onSettingsChanged((settings) => {
+        if (!settings.enabled && isActive) {
+            _teardown();
+        } else if (settings.enabled && !isActive) {
+            _tryInit(0);
+        }
     });
 }
 
@@ -129,6 +144,9 @@ function _tryInit(attempt) {
 function _activate(chatId) {
     // If already active for this chat, skip
     if (isActive && currentChatId === chatId) return;
+
+    // Check if enabled
+    if (!getSetting('enabled')) return;
 
     // Teardown previous state if switching chats
     if (isActive) {

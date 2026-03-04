@@ -78,7 +78,11 @@ function extractFirstLine(element) {
  * @param {number} [max=MAX_LABEL_LENGTH] — Maximum allowed characters.
  * @returns {string} The trimmed label.
  */
-function trimLabel(text, max = MAX_LABEL_LENGTH) {
+function trimLabel(text, max) {
+  // Use setting if available, otherwise fall back to constant
+  if (max === undefined) {
+    max = (typeof getSetting === 'function') ? getSetting('labelMaxLength') : MAX_LABEL_LENGTH;
+  }
   if (!text) return '';
 
   if (text.length <= max) {

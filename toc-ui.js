@@ -87,6 +87,15 @@ let ltrBtnElement = null;
 /** @type {HTMLElement|null} RTL direction button */
 let rtlBtnElement = null;
 
+/** @type {HTMLElement|null} Settings overlay */
+let settingsOverlayElement = null;
+
+/** @type {HTMLElement|null} Settings gear button */
+let settingsBtnElement = null;
+
+/** @type {Function|null} Reference to the global keyboard event listener */
+let keyboardShortcutListener = null;
+
 // ──────────────────────────────────────────────
 // Panel Creation
 // ──────────────────────────────────────────────
@@ -141,12 +150,27 @@ function createPanel() {
     _buildToggleButton();
     _buildPanel();
 
+    // Apply panel position and width from settings
+    _applyPanelPosition(getSetting('panelPosition'));
+    _applyPanelWidth(getSetting('panelWidth'));
+
     // Mount to page
     document.body.appendChild(hostElement);
 
     // Start theme detection
     _detectTheme();
     themeCheckTimer = setInterval(_detectTheme, THEME_CHECK_INTERVAL_MS);
+
+    // Auto-open panel if setting is enabled
+    if (getSetting('autoOpenPanel')) {
+        _openPanel();
+    }
+
+    // Add keyboard shortcut listener (Alt + T)
+    if (!keyboardShortcutListener) {
+        keyboardShortcutListener = _handleKeyboardShortcut;
+        document.addEventListener('keydown', keyboardShortcutListener);
+    }
 }
 
 /**
@@ -168,6 +192,11 @@ function destroyPanel() {
         currentHighlight = null;
     }
 
+    if (keyboardShortcutListener) {
+        document.removeEventListener('keydown', keyboardShortcutListener);
+        keyboardShortcutListener = null;
+    }
+
     if (hostElement && hostElement.parentNode) {
         hostElement.parentNode.removeChild(hostElement);
     }
@@ -181,6 +210,8 @@ function destroyPanel() {
     listContainerElement = null;
     ltrBtnElement = null;
     rtlBtnElement = null;
+    settingsOverlayElement = null;
+    settingsBtnElement = null;
 }
 
 // ──────────────────────────────────────────────
@@ -191,8 +222,8 @@ function destroyPanel() {
 function _buildToggleButton() {
     toggleBtnElement = document.createElement('button');
     toggleBtnElement.className = 'toc-toggle-btn';
-    toggleBtnElement.setAttribute('aria-label', 'Open Table of Contents');
-    toggleBtnElement.setAttribute('title', 'Table of Contents');
+    toggleBtnElement.setAttribute('aria-label', 'Open Table of Contents (Alt + T)');
+    toggleBtnElement.setAttribute('title', 'Table of Contents (Alt + T)');
     toggleBtnElement.innerHTML = `
         <span class="toc-drag-arrow up">&#9652;</span>
         <span class="toc-toggle-icon">☰</span>
@@ -353,11 +384,27 @@ function _buildPanel() {
     header.appendChild(headerActions);
     panelElement.appendChild(header);
 
-    // Toolbar (below header) — holds direction toggle & refresh
+    // Settings gear button
+    settingsBtnElement = document.createElement('button');
+    settingsBtnElement.className = 'toc-settings-btn';
+    settingsBtnElement.setAttribute('aria-label', 'Settings');
+    settingsBtnElement.setAttribute('title', 'Settings');
+    settingsBtnElement.innerHTML = '&#x2699;';
+    settingsBtnElement.addEventListener('click', () => {
+        _openSettingsOverlay();
+    });
+
+    // Toolbar (below header) — holds direction toggle, refresh & settings
     const toolbar = document.createElement('div');
     toolbar.className = 'toc-toolbar';
     toolbar.appendChild(dirGroup);
-    toolbar.appendChild(refreshBtn);
+
+    // Right side of toolbar: refresh + settings
+    const toolbarRight = document.createElement('div');
+    toolbarRight.className = 'toc-toolbar-right';
+    toolbarRight.appendChild(refreshBtn);
+    toolbarRight.appendChild(settingsBtnElement);
+    toolbar.appendChild(toolbarRight);
     panelElement.appendChild(toolbar);
 
     // Scrollable list container
@@ -381,6 +428,10 @@ function _buildPanel() {
     listContainerElement.appendChild(tocListElement);
     listContainerElement.appendChild(emptyStateElement);
     panelElement.appendChild(listContainerElement);
+
+    // Build settings overlay (hidden by default)
+    _buildSettingsOverlay();
+    panelElement.appendChild(settingsOverlayElement);
 
     shadowRoot.appendChild(panelElement);
 }
@@ -456,6 +507,29 @@ function _closePanel() {
     if (toggleBtnElement) toggleBtnElement.classList.remove('hidden');
 }
 
+function _togglePanel() {
+    if (panelElement && panelElement.classList.contains('open')) {
+        _closePanel();
+    } else {
+        _openPanel();
+    }
+}
+
+/**
+ * Handles global keyboard shortcuts.
+ * Alt + T → toggles the panel.
+ * @param {KeyboardEvent} e
+ */
+function _handleKeyboardShortcut(e) {
+    // Only respond to Alt + T (don't interfere with inputs/textareas if we can help it,
+    // although Alt+T is relatively safe, we want to be clean).
+    if (e.altKey && e.code === 'KeyT') {
+        // Prevent default browser behavior for Alt+T (often opens a new tab or menu in some contexts)
+        e.preventDefault();
+        _togglePanel();
+    }
+}
+
 // ──────────────────────────────────────────────
 // TOC Rendering
 // ──────────────────────────────────────────────
@@ -484,8 +558,10 @@ function renderTOC(items) {
         tocListElement.appendChild(li);
     });
 
-    // Auto-detect language direction after full render
-    _autoDetectDirection();
+    // Auto-detect language direction after full render (if setting enabled)
+    if (getSetting('autoDetectDirection')) {
+        _autoDetectDirection();
+    }
 }
 
 /**
@@ -570,6 +646,9 @@ function _scrollToMessage(element) {
 
     // Smooth scroll into the center of the viewport
     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Skip highlight animation if setting is off
+    if (!getSetting('highlightOnScroll')) return;
 
     // Apply highlight animation
     element.style.animation = `toc-highlight-fade ${HIGHLIGHT_DURATION_MS}ms ease-out`;
@@ -658,6 +737,19 @@ function _hideEmptyState() {
 function _detectTheme() {
     if (!hostElement) return;
 
+    const mode = getSetting('themeMode');
+
+    // If user forced a specific theme, apply it directly
+    if (mode === 'dark') {
+        hostElement.classList.add(DARK_THEME_CLASS);
+        return;
+    }
+    if (mode === 'light') {
+        hostElement.classList.remove(DARK_THEME_CLASS);
+        return;
+    }
+
+    // Auto-detect from ChatGPT's page
     const htmlEl = document.documentElement;
     const isDark =
         htmlEl.classList.contains('dark') ||
@@ -670,4 +762,296 @@ function _detectTheme() {
     } else {
         hostElement.classList.remove(DARK_THEME_CLASS);
     }
+}
+
+// ──────────────────────────────────────────────
+// Panel Position
+// ──────────────────────────────────────────────
+
+/**
+ * Applies the panel position (left or right) by toggling CSS classes.
+ * @param {'left'|'right'} position
+ */
+function _applyPanelPosition(position) {
+    if (!hostElement) return;
+
+    if (position === 'left') {
+        hostElement.classList.add('panel-left');
+    } else {
+        hostElement.classList.remove('panel-left');
+    }
+}
+
+/**
+ * Applies the panel width by setting a CSS custom property.
+ * @param {number} width — Width in pixels (240, 280, 320, 360).
+ */
+function _applyPanelWidth(width) {
+    if (!hostElement) return;
+    hostElement.style.setProperty('--toc-panel-width', width + 'px');
+}
+
+// ──────────────────────────────────────────────
+// Settings Overlay
+// ──────────────────────────────────────────────
+
+/**
+ * Builds the settings overlay panel (hidden by default).
+ * Contains all 7 settings with appropriate controls.
+ */
+function _buildSettingsOverlay() {
+    settingsOverlayElement = document.createElement('div');
+    settingsOverlayElement.className = 'toc-settings-overlay';
+
+    // Settings header with back button
+    const header = document.createElement('div');
+    header.className = 'toc-settings-header';
+
+    const backBtn = document.createElement('button');
+    backBtn.className = 'toc-settings-back-btn';
+    backBtn.innerHTML = '&#x2190;';
+    backBtn.setAttribute('aria-label', 'Back to contents');
+    backBtn.setAttribute('title', 'Back');
+    backBtn.addEventListener('click', () => {
+        _closeSettingsOverlay();
+    });
+
+    const settingsTitle = document.createElement('span');
+    settingsTitle.className = 'toc-settings-title';
+    settingsTitle.textContent = 'Settings';
+
+    header.appendChild(backBtn);
+    header.appendChild(settingsTitle);
+    settingsOverlayElement.appendChild(header);
+
+    // Settings body (scrollable)
+    const body = document.createElement('div');
+    body.className = 'toc-settings-body';
+
+    // 1. Enable Thread Map
+    body.appendChild(_createToggleSetting(
+        'Enable Thread Map',
+        'Master on/off switch',
+        'enabled',
+        getSetting('enabled')
+    ));
+
+    // 2. Scroll Highlight
+    body.appendChild(_createToggleSetting(
+        'Scroll highlight',
+        'Highlight animation when navigating',
+        'highlightOnScroll',
+        getSetting('highlightOnScroll')
+    ));
+
+    // 3. Theme Mode
+    body.appendChild(_createSelectSetting(
+        'Theme mode',
+        'themeMode',
+        getSetting('themeMode'),
+        [
+            { value: 'auto', label: 'Auto' },
+            { value: 'light', label: 'Light' },
+            { value: 'dark', label: 'Dark' },
+        ]
+    ));
+
+    // 4. Auto-detect Direction
+    body.appendChild(_createToggleSetting(
+        'Auto-detect direction',
+        'Detect RTL/LTR from messages',
+        'autoDetectDirection',
+        getSetting('autoDetectDirection')
+    ));
+
+    // 5. Label Max Length
+    body.appendChild(_createSelectSetting(
+        'Label max length',
+        'labelMaxLength',
+        getSetting('labelMaxLength'),
+        [
+            { value: 30, label: '30 chars' },
+            { value: 60, label: '60 chars' },
+            { value: 90, label: '90 chars' },
+            { value: 120, label: '120 chars' },
+        ]
+    ));
+
+    // 6. Auto-open Panel
+    body.appendChild(_createToggleSetting(
+        'Auto-open panel',
+        'Open panel on page load',
+        'autoOpenPanel',
+        getSetting('autoOpenPanel')
+    ));
+
+    // 7. Panel Position
+    body.appendChild(_createSelectSetting(
+        'Panel position',
+        'panelPosition',
+        getSetting('panelPosition'),
+        [
+            { value: 'right', label: 'Right' },
+            { value: 'left', label: 'Left' },
+        ]
+    ));
+
+    // 8. Panel Width
+    body.appendChild(_createSelectSetting(
+        'Panel width',
+        'panelWidth',
+        getSetting('panelWidth'),
+        [
+            { value: 240, label: '240px' },
+            { value: 280, label: '280px' },
+            { value: 320, label: '320px' },
+            { value: 360, label: '360px' },
+        ]
+    ));
+
+    settingsOverlayElement.appendChild(body);
+}
+
+/**
+ * Creates a toggle-style setting row.
+ *
+ * @param {string} label — Display name
+ * @param {string} description — Short description
+ * @param {string} key — Settings key
+ * @param {boolean} currentValue
+ * @returns {HTMLElement}
+ */
+function _createToggleSetting(label, description, key, currentValue) {
+    const row = document.createElement('div');
+    row.className = 'toc-setting-row';
+
+    const info = document.createElement('div');
+    info.className = 'toc-setting-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'toc-setting-name';
+    nameEl.textContent = label;
+
+    const descEl = document.createElement('div');
+    descEl.className = 'toc-setting-desc';
+    descEl.textContent = description;
+
+    info.appendChild(nameEl);
+    info.appendChild(descEl);
+
+    // Toggle switch
+    const toggle = document.createElement('label');
+    toggle.className = 'toc-toggle-switch';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = currentValue;
+    input.addEventListener('change', () => {
+        saveSettings({ [key]: input.checked });
+        _handleSettingChange(key, input.checked);
+    });
+
+    const slider = document.createElement('span');
+    slider.className = 'toc-toggle-slider';
+
+    toggle.appendChild(input);
+    toggle.appendChild(slider);
+
+    row.appendChild(info);
+    row.appendChild(toggle);
+    return row;
+}
+
+/**
+ * Creates a select/dropdown-style setting row.
+ *
+ * @param {string} label — Display name
+ * @param {string} key — Settings key
+ * @param {*} currentValue
+ * @param {Array<{value: *, label: string}>} options
+ * @returns {HTMLElement}
+ */
+function _createSelectSetting(label, key, currentValue, options) {
+    const row = document.createElement('div');
+    row.className = 'toc-setting-row';
+
+    const info = document.createElement('div');
+    info.className = 'toc-setting-info';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'toc-setting-name';
+    nameEl.textContent = label;
+
+    info.appendChild(nameEl);
+
+    const select = document.createElement('select');
+    select.className = 'toc-select';
+
+    for (const opt of options) {
+        const optEl = document.createElement('option');
+        optEl.value = opt.value;
+        optEl.textContent = opt.label;
+        if (String(opt.value) === String(currentValue)) {
+            optEl.selected = true;
+        }
+        select.appendChild(optEl);
+    }
+
+    select.addEventListener('change', () => {
+        // Parse numeric values if appropriate
+        let val = select.value;
+        if (key === 'labelMaxLength' || key === 'panelWidth') val = parseInt(val, 10);
+        saveSettings({ [key]: val });
+        _handleSettingChange(key, val);
+    });
+
+    row.appendChild(info);
+    row.appendChild(select);
+    return row;
+}
+
+/**
+ * Handles immediate visual effects from a setting change.
+ * @param {string} key
+ * @param {*} value
+ */
+function _handleSettingChange(key, value) {
+    switch (key) {
+        case 'enabled':
+            if (!value) {
+                // Teardown from content.js will handle this via onSettingsChanged
+            }
+            break;
+        case 'themeMode':
+            _detectTheme();
+            break;
+        case 'panelPosition':
+            _applyPanelPosition(value);
+            break;
+        case 'autoDetectDirection':
+            if (value) _autoDetectDirection();
+            break;
+        case 'labelMaxLength':
+            // Will apply on next refresh
+            break;
+        case 'panelWidth':
+            _applyPanelWidth(value);
+            break;
+    }
+}
+
+/**
+ * Opens the settings overlay, hiding the TOC list.
+ */
+function _openSettingsOverlay() {
+    if (settingsOverlayElement) settingsOverlayElement.classList.add('open');
+    if (listContainerElement) listContainerElement.style.display = 'none';
+}
+
+/**
+ * Closes the settings overlay, restoring the TOC list.
+ */
+function _closeSettingsOverlay() {
+    if (settingsOverlayElement) settingsOverlayElement.classList.remove('open');
+    if (listContainerElement) listContainerElement.style.display = '';
 }
