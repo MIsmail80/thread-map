@@ -193,7 +193,20 @@ function _buildToggleButton() {
     toggleBtnElement.className = 'toc-toggle-btn';
     toggleBtnElement.setAttribute('aria-label', 'Open Table of Contents');
     toggleBtnElement.setAttribute('title', 'Table of Contents');
-    toggleBtnElement.textContent = '☰';
+    toggleBtnElement.innerHTML = `
+        <span class="toc-drag-arrow up">&#9652;</span>
+        <span class="toc-toggle-icon">☰</span>
+        <span class="toc-drag-arrow down">&#9662;</span>
+    `;
+
+    // Try to load saved vertical position
+    if (chrome && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['tocButtonTop'], (result) => {
+            if (result.tocButtonTop) {
+                toggleBtnElement.style.top = result.tocButtonTop;
+            }
+        });
+    }
 
     let isDragging = false;
     let startY = 0;
@@ -220,6 +233,11 @@ function _buildToggleButton() {
             isDragging = false;
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
+
+            // Save new position across chats if moved
+            if (hasMoved && chrome && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.set({ tocButtonTop: toggleBtnElement.style.top });
+            }
         }
     }
 
