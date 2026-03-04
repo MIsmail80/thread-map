@@ -93,6 +93,15 @@ let settingsBtnElement = null;
 /** @type {Function|null} Reference to the global keyboard event listener */
 let keyboardShortcutListener = null;
 
+/** @type {IntersectionObserver|null} Observer for scrolling TOC highlighting */
+let scrollObserver = null;
+
+/** @type {Map<Element, HTMLElement>} Map of message elements to their TOC item buttons */
+let messageToTOCItemMap = new Map();
+
+/** @type {Set<Element>} Currently intersecting messages */
+let currentlyIntersecting = new Set();
+
 // ──────────────────────────────────────────────
 // Panel Creation
 // ──────────────────────────────────────────────
@@ -207,6 +216,13 @@ function destroyPanel() {
         document.removeEventListener('keydown', keyboardShortcutListener);
         keyboardShortcutListener = null;
     }
+
+    if (scrollObserver) {
+        scrollObserver.disconnect();
+        scrollObserver = null;
+    }
+    messageToTOCItemMap.clear();
+    currentlyIntersecting.clear();
 
     if (hostElement && hostElement.parentNode) {
         hostElement.parentNode.removeChild(hostElement);
@@ -522,6 +538,13 @@ function _autoDetectDirection() {
 function _openPanel() {
     if (panelElement) panelElement.classList.add('open');
     if (toggleBtnElement) toggleBtnElement.classList.add('hidden');
+
+    // Force active highlight update and scroll to view when opened
+    setTimeout(() => {
+        if (typeof _updateActiveHighlight === 'function') {
+            _updateActiveHighlight();
+        }
+    }, 350); // wait for CSS transition to complete
 }
 
 function _closePanel() {
@@ -568,6 +591,13 @@ function renderTOC(items) {
     // Clear existing items
     tocListElement.innerHTML = '';
 
+    // Reset scroll observer
+    if (scrollObserver) {
+        scrollObserver.disconnect();
+    }
+    messageToTOCItemMap.clear();
+    currentlyIntersecting.clear();
+
     if (items.length === 0) {
         _showEmptyState();
         return;
@@ -575,9 +605,22 @@ function renderTOC(items) {
 
     _hideEmptyState();
 
+    // Setup scroll observer
+    scrollObserver = new IntersectionObserver(_handleScrollIntersection, {
+        root: null,
+        rootMargin: '10% 0px 10% 0px',
+        threshold: 0
+    });
+
     items.forEach((item, index) => {
         const li = _createTOCItem(item, index + 1);
         tocListElement.appendChild(li);
+
+        if (item.element) {
+            scrollObserver.observe(item.element);
+            const btn = li.querySelector('.toc-item-btn');
+            if (btn) messageToTOCItemMap.set(item.element, btn);
+        }
     });
 
     // Auto-detect language direction after full render (if setting enabled)
@@ -599,6 +642,19 @@ function addTOCItem(item, index) {
 
     const li = _createTOCItem(item, index);
     tocListElement.appendChild(li);
+
+    if (item.element) {
+        if (!scrollObserver) {
+            scrollObserver = new IntersectionObserver(_handleScrollIntersection, {
+                root: null,
+                rootMargin: '10% 0px 10% 0px',
+                threshold: 0
+            });
+        }
+        scrollObserver.observe(item.element);
+        const btn = li.querySelector('.toc-item-btn');
+        if (btn) messageToTOCItemMap.set(item.element, btn);
+    }
 }
 
 /**
@@ -608,6 +664,13 @@ function clearTOC() {
     if (tocListElement) {
         tocListElement.innerHTML = '';
     }
+
+    if (scrollObserver) {
+        scrollObserver.disconnect();
+    }
+    messageToTOCItemMap.clear();
+    currentlyIntersecting.clear();
+
     _showEmptyState();
 }
 
@@ -647,6 +710,88 @@ function _createTOCItem(item, number) {
 
     li.appendChild(btn);
     return li;
+}
+
+/**
+ * IntersectionObserver callback for scrolling active TOC highlighting.
+ * @param {IntersectionObserverEntry[]} entries
+ */
+function _handleScrollIntersection(entries) {
+    let changed = false;
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            currentlyIntersecting.add(entry.target);
+            changed = true;
+        } else {
+            currentlyIntersecting.delete(entry.target);
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        _updateActiveHighlight();
+    }
+}
+
+/**
+ * Evaluates currently visible messages and highlights the topmost active item.
+ */
+function _updateActiveHighlight() {
+    let bestTarget = null;
+
+    if (currentlyIntersecting.size === 0) {
+        // Default to the last message if nothing is intersecting yet
+        // (e.g. chat just opened and it automatically scrolled to the bottom input box)
+        const allTargets = Array.from(messageToTOCItemMap.keys());
+        if (allTargets.length > 0) {
+            bestTarget = allTargets[allTargets.length - 1];
+        } else {
+            return;
+        }
+    } else {
+        // Evaluate the most relevant visible element
+        let sortedTargets = Array.from(currentlyIntersecting).sort((a, b) => {
+            return a.getBoundingClientRect().top - b.getBoundingClientRect().top;
+        });
+
+        bestTarget = sortedTargets[0];
+        const HEADER_OFFSET = 60; // Estimated ChatGPT sticky header height
+
+        for (let i = 0; i < sortedTargets.length; i++) {
+            const target = sortedTargets[i];
+            const rect = target.getBoundingClientRect();
+
+            const visibleTop = Math.max(rect.top, HEADER_OFFSET);
+            const visibleHeight = rect.bottom - visibleTop;
+
+            // If the element's top is visible, OR it has at least 30px visible below header
+            if (rect.top >= HEADER_OFFSET - 5 || visibleHeight > 30 || i === sortedTargets.length - 1) {
+                bestTarget = target;
+                break;
+            }
+        }
+    }
+
+    if (bestTarget) {
+        const activeBtn = messageToTOCItemMap.get(bestTarget);
+        if (activeBtn) {
+            // Remove active class from all
+            messageToTOCItemMap.forEach(btn => btn.classList.remove('active'));
+
+            // Add active class to current
+            activeBtn.classList.add('active');
+
+            // Keep the active item in view within the TOC list container
+            if (listContainerElement) {
+                const containerRect = listContainerElement.getBoundingClientRect();
+                const btnRect = activeBtn.getBoundingClientRect();
+
+                if (btnRect.top < containerRect.top || btnRect.bottom > containerRect.bottom) {
+                    activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+        }
+    }
 }
 
 // ──────────────────────────────────────────────

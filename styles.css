@@ -408,6 +408,15 @@
   background: var(--toc-active-bg);
 }
 
+.toc-item-btn.active {
+  background: var(--toc-active-bg);
+  box-shadow: inset 3px 0 0 #6366f1;
+}
+
+.toc-list-container[dir="rtl"] .toc-item-btn.active {
+  box-shadow: inset -3px 0 0 #6366f1;
+}
+
 .toc-item-number {
   flex-shrink: 0;
   font-size: 11px;
