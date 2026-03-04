@@ -3,3 +3,6 @@ node_modules
 Thumbs.db
 .env
 .vscode
+artifacts
+.agent
+/artfacts
