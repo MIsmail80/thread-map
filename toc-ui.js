@@ -69,6 +69,9 @@ let emptyStateElement = null;
 /** @type {HTMLElement|null} */
 let listContainerElement = null;
 
+/** @type {HTMLElement|null} */
+let progressIndicatorElement = null;
+
 /** @type {MutationObserver|null} Observer for html theme attributes */
 let themeObserver = null;
 
@@ -235,6 +238,7 @@ function destroyPanel() {
     toggleBtnElement = null;
     emptyStateElement = null;
     listContainerElement = null;
+    progressIndicatorElement = null;
     ltrBtnElement = null;
     rtlBtnElement = null;
     settingsOverlayElement = null;
@@ -450,9 +454,19 @@ function _buildPanel() {
     listContainerElement.className = 'toc-list-container';
 
     // "Contents" section label above the list
-    const sectionLabel = document.createElement('div');
+    const sectionHeader = document.createElement('div');
+    sectionHeader.className = 'toc-section-header';
+
+    const sectionLabel = document.createElement('span');
     sectionLabel.className = 'toc-section-label';
     sectionLabel.textContent = 'Contents';
+
+    progressIndicatorElement = document.createElement('span');
+    progressIndicatorElement.className = 'toc-progress-indicator';
+    progressIndicatorElement.textContent = '';
+
+    sectionHeader.appendChild(sectionLabel);
+    sectionHeader.appendChild(progressIndicatorElement);
 
     tocListElement = document.createElement('ol');
     tocListElement.className = 'toc-list';
@@ -462,7 +476,7 @@ function _buildPanel() {
     emptyStateElement.className = 'toc-empty';
     emptyStateElement.textContent = 'No user messages yet.';
 
-    listContainerElement.appendChild(sectionLabel);
+    listContainerElement.appendChild(sectionHeader);
     listContainerElement.appendChild(tocListElement);
     listContainerElement.appendChild(emptyStateElement);
     panelElement.appendChild(listContainerElement);
@@ -599,6 +613,7 @@ function renderTOC(items) {
     currentlyIntersecting.clear();
 
     if (items.length === 0) {
+        if (progressIndicatorElement) progressIndicatorElement.textContent = '';
         _showEmptyState();
         return;
     }
@@ -671,6 +686,7 @@ function clearTOC() {
     messageToTOCItemMap.clear();
     currentlyIntersecting.clear();
 
+    if (progressIndicatorElement) progressIndicatorElement.textContent = '';
     _showEmptyState();
 }
 
@@ -746,6 +762,7 @@ function _updateActiveHighlight() {
         if (allTargets.length > 0) {
             bestTarget = allTargets[allTargets.length - 1];
         } else {
+            if (progressIndicatorElement) progressIndicatorElement.textContent = '';
             return;
         }
     } else {
@@ -780,6 +797,13 @@ function _updateActiveHighlight() {
 
             // Add active class to current
             activeBtn.classList.add('active');
+
+            // Update progress indicator
+            const total = messageToTOCItemMap.size;
+            const activeIndex = Array.from(tocListElement.children).indexOf(activeBtn.parentElement) + 1;
+            if (progressIndicatorElement) {
+                progressIndicatorElement.textContent = `${activeIndex} / ${total} prompts`;
+            }
 
             // Keep the active item in view within the TOC list container
             if (listContainerElement) {
