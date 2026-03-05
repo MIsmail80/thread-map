@@ -13,23 +13,23 @@
 
 :host {
   /* Light theme defaults — semi-transparent for glassmorphism */
-  --toc-bg: rgba(255, 255, 255, 0.65);
-  --toc-text: #1a1a1a;
-  --toc-text-secondary: #6b7280;
-  --toc-border: rgba(229, 231, 235, 0.5);
-  --toc-hover-bg: rgba(243, 244, 246, 0.6);
-  --toc-active-bg: rgba(229, 231, 235, 0.6);
-  --toc-accent: #4b5563;
-  --toc-toggle-bg: rgba(255, 255, 255, 0.7);
-  --toc-toggle-text: #374151;
-  --toc-toggle-hover-bg: rgba(243, 244, 246, 0.7);
-  --toc-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  --toc-scrollbar-track: rgba(241, 241, 241, 0.5);
-  --toc-scrollbar-thumb: rgba(196, 196, 196, 0.6);
-  --toc-header-bg: rgba(249, 250, 251, 0.55);
-  --toc-toolbar-bg: rgba(243, 244, 246, 0.45);
-  --toc-counter-color: #6b7280;
-  --toc-highlight-bg: rgba(75, 85, 99, 0.08);
+  --toc-bg: rgba(255, 255, 255, 0.85);
+  --toc-text: #0f172a;
+  --toc-text-secondary: #475569;
+  --toc-border: rgba(0, 0, 0, 0.12);
+  --toc-hover-bg: rgba(0, 0, 0, 0.05);
+  --toc-active-bg: rgba(0, 0, 0, 0.09);
+  --toc-accent: #0f172a;
+  --toc-toggle-bg: rgba(255, 255, 255, 0.9);
+  --toc-toggle-text: #0f172a;
+  --toc-toggle-hover-bg: #ffffff;
+  --toc-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  --toc-scrollbar-track: rgba(0, 0, 0, 0.02);
+  --toc-scrollbar-thumb: rgba(0, 0, 0, 0.2);
+  --toc-header-bg: rgba(255, 255, 255, 0.8);
+  --toc-toolbar-bg: rgba(248, 250, 252, 0.8);
+  --toc-counter-color: #475569;
+  --toc-highlight-bg: rgba(99, 102, 241, 0.12);
   --toc-blur: 16px;
   --toc-panel-width: 280px;
 }
