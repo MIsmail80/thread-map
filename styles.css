@@ -36,23 +36,23 @@
 
 /* Dark theme — triggered by ChatGPT's dark mode class on <html> */
 :host(.dark-theme) {
-  --toc-bg: rgba(30, 30, 46, 0.6);
+  --toc-bg: rgba(26, 26, 26, 0.6);
   --toc-text: #e4e4e7;
-  --toc-text-secondary: #9ca3af;
-  --toc-border: rgba(46, 46, 62, 0.5);
-  --toc-hover-bg: rgba(42, 42, 58, 0.55);
-  --toc-active-bg: rgba(55, 65, 81, 0.55);
-  --toc-accent: #9ca3af;
-  --toc-toggle-bg: rgba(30, 30, 46, 0.7);
+  --toc-text-secondary: #a3a3a3;
+  --toc-border: rgba(64, 64, 64, 0.5);
+  --toc-hover-bg: rgba(38, 38, 38, 0.55);
+  --toc-active-bg: rgba(55, 55, 55, 0.55);
+  --toc-accent: #a3a3a3;
+  --toc-toggle-bg: rgba(26, 26, 26, 0.7);
   --toc-toggle-text: #e4e4e7;
-  --toc-toggle-hover-bg: rgba(42, 42, 58, 0.7);
+  --toc-toggle-hover-bg: rgba(38, 38, 38, 0.7);
   --toc-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-  --toc-scrollbar-track: rgba(30, 30, 46, 0.5);
-  --toc-scrollbar-thumb: rgba(58, 58, 74, 0.6);
-  --toc-header-bg: rgba(23, 23, 35, 0.5);
-  --toc-toolbar-bg: rgba(18, 18, 28, 0.4);
-  --toc-counter-color: #9ca3af;
-  --toc-highlight-bg: rgba(156, 163, 175, 0.1);
+  --toc-scrollbar-track: rgba(26, 26, 26, 0.5);
+  --toc-scrollbar-thumb: rgba(70, 70, 70, 0.6);
+  --toc-header-bg: rgba(20, 20, 20, 0.5);
+  --toc-toolbar-bg: rgba(15, 15, 15, 0.4);
+  --toc-counter-color: #a3a3a3;
+  --toc-highlight-bg: rgba(163, 163, 163, 0.1);
   --toc-blur: 18px;
 }
 

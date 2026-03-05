@@ -35,16 +35,39 @@ const TRUNCATION_SUFFIX = '…';
 function extractFirstLine(element) {
   if (!element) return null;
 
-  // innerText respects CSS visibility and produces layout-aware text
-  const text = element.innerText;
+  // Clone the node so we can destructively remove hidden elements without affecting the real DOM
+  const clone = element.cloneNode(true);
+
+  // Remove common visually-hidden / screen-reader-only elements (crucial for Gemini's "You said")
+  const hiddenSelectors = ['.sr-only', '.visually-hidden', '.v-off-screen', '[aria-hidden="true"]'];
+  hiddenSelectors.forEach(sel => {
+    clone.querySelectorAll(sel).forEach(n => n.remove());
+  });
+
+  // innerText on an unattached DOM node might not fully compute CSS visibility,
+  // but removing the specific hidden classes manually covers most cases like Gemini.
+  const text = clone.innerText || clone.textContent || '';
   if (!text) return null;
 
   const lines = text.split('\n');
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
+    let trimmed = line.trim();
+    if (trimmed.length > 0 && trimmed.toLowerCase() !== 'you said') {
+      // For Gemini: forcefully strip leading "You said" or "You said:" just in case
+      // the DOM cleanup didn't catch it
+      const lower = trimmed.toLowerCase();
+      if (lower.startsWith('you said:')) {
+        trimmed = trimmed.substring(9).trim();
+      } else if (lower.startsWith('you said\n') || lower.startsWith('you said ')) {
+        trimmed = trimmed.substring(8).trim();
+      } else if (lower === 'you said') {
+        continue;
+      }
+
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
     }
   }
 
