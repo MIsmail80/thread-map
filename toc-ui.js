@@ -1,5 +1,5 @@
 /**
- * toc-ui.js — Shadow DOM floating panel for ChatGPT Auto TOC
+ * toc-ui.js — Shadow DOM floating panel for ThreadMap
  *
  * Creates a fully isolated UI (Shadow DOM) with:
  *   - Toggle button (right side, vertically centered)
@@ -108,6 +108,9 @@ let settingsBtnElement = null;
 /** @type {Function|null} Reference to the global keyboard event listener */
 let keyboardShortcutListener = null;
 
+/** @type {Object|null} Current platform adapter for empty state text */
+let _currentPanelPlatform = null;
+
 /** @type {IntersectionObserver|null} Observer for scrolling TOC highlighting */
 let scrollObserver = null;
 
@@ -125,13 +128,16 @@ let currentlyIntersecting = new Set();
  * Creates and mounts the TOC panel inside a Shadow DOM.
  * Idempotent — calling it again does nothing if already mounted.
  */
-function createPanel() {
+function createPanel(platform) {
     if (hostElement) return; // Already created
+
+    // Store platform reference for empty state text
+    _currentPanelPlatform = platform || null;
 
     // Create host container
     hostElement = document.createElement('div');
-    hostElement.id = 'chatgpt-auto-toc-host';
-    hostElement.setAttribute('data-chatgpt-auto-toc', 'true');
+    hostElement.id = 'threadmap-toc-host';
+    hostElement.setAttribute('data-threadmap-toc', 'true');
     // Hide initially to prevent FOUC (Flash of Unstyled Content) before CSS loads
     hostElement.style.display = 'none';
 
@@ -259,6 +265,7 @@ function destroyPanel() {
     rtlBtnElement = null;
     settingsOverlayElement = null;
     settingsBtnElement = null;
+    _currentPanelPlatform = null;
 }
 
 // ──────────────────────────────────────────────
@@ -498,8 +505,11 @@ function _buildPanel() {
     // Empty state
     emptyStateElement = document.createElement('div');
     emptyStateElement.className = 'toc-empty';
+    const emptyText = (_currentPanelPlatform && _currentPanelPlatform.getEmptyStateText)
+        ? _currentPanelPlatform.getEmptyStateText()
+        : 'Start a conversation.';
     emptyStateElement.innerHTML = `
-        <strong>Start asking ChatGPT something.</strong><br>
+        <strong>${emptyText}</strong><br>
         Your prompts will appear here.
     `;
 
@@ -1018,7 +1028,7 @@ function _ensureHighlightStyles() {
     if (highlightStylesInjected) return;
 
     const style = document.createElement('style');
-    style.setAttribute('data-chatgpt-auto-toc', 'highlight');
+    style.setAttribute('data-threadmap-toc', 'highlight');
     style.textContent = `
     @keyframes toc-highlight-fade {
       0% {
@@ -1069,11 +1079,12 @@ function _hideEmptyState() {
 // ──────────────────────────────────────────────
 
 /**
- * Detects whether ChatGPT is in dark mode and updates the host class.
+ * Detects whether the page is in dark mode and updates the host class.
  *
  * Strategy:
- *   1. Check for `dark` class on <html> element (ChatGPT convention).
- *   2. Fallback to `prefers-color-scheme` media query.
+ *   1. Check for `dark` class on <html> element (common convention).
+ *   2. Check for `data-theme="dark"` attribute.
+ *   3. Fallback to `prefers-color-scheme` media query.
  */
 function _detectTheme() {
     if (!hostElement) return;
@@ -1090,7 +1101,7 @@ function _detectTheme() {
         return;
     }
 
-    // Auto-detect from ChatGPT's page
+    // Auto-detect from page theme
     const htmlEl = document.documentElement;
     const isDark =
         htmlEl.classList.contains('dark') ||

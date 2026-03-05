@@ -1,8 +1,8 @@
 /**
- * styles.css — All styles for the ChatGPT Auto TOC panel.
+ * styles.css — All styles for the ThreadMap TOC panel.
  *
  * Injected INSIDE a Shadow DOM, so these rules are fully scoped
- * and cannot conflict with the ChatGPT host page.
+ * and cannot conflict with the host page.
  *
  * PRIVACY: No external fonts, images, or resources loaded.
  */

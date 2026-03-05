@@ -1,11 +1,13 @@
 /**
- * content.js — Entry point for ChatGPT Auto TOC
+ * content.js — Entry point for ThreadMap
  *
  * Orchestrates initialization, teardown, and lifecycle management.
  * Delegates all logic to specialized modules:
- *   - utils.js:    Pure helpers (chat ID extraction, text trimming, debounce)
- *   - observer.js: DOM observation and SPA navigation detection
- *   - toc-ui.js:   Shadow DOM floating panel
+ *   - utils.js:              Pure helpers (text trimming, debounce, hashing)
+ *   - observer.js:           DOM observation and SPA navigation detection
+ *   - toc-ui.js:             Shadow DOM floating panel
+ *   - platform-detector.js:  Platform detection (ChatGPT, Gemini, Claude)
+ *   - platforms/*.js:         Platform-specific DOM adapters
  *
  * ══════════════════════════════════════════════════════════
  *  PRIVACY NOTICE
@@ -21,7 +23,7 @@
 
 /**
  * Delay (ms) before initializing after page load or navigation.
- * Gives ChatGPT time to render conversation messages.
+ * Gives the platform time to render conversation messages.
  */
 const INIT_DELAY_MS = 800;
 
@@ -48,6 +50,9 @@ let currentChatId = null;
 /** @type {number} Running count of TOC items rendered */
 let tocItemCount = 0;
 
+/** @type {Object|null} Current platform adapter */
+let currentPlatform = null;
+
 // ──────────────────────────────────────────────
 // Extension Context Guard
 // ──────────────────────────────────────────────
@@ -72,19 +77,29 @@ function _isExtensionContextValid() {
 // ──────────────────────────────────────────────
 
 /**
- * Main entry point. Loads settings, then waits for the page to settle
- * and initializes if we're on a conversation page.
+ * Main entry point. Detects platform, loads settings, then waits
+ * for the page to settle and initializes if we're on a conversation page.
  */
 function main() {
     // Bail out if extension context was invalidated
     if (!_isExtensionContextValid()) return;
+
+    // Detect the current platform
+    currentPlatform = detectPlatform();
+    if (!currentPlatform) {
+        console.warn('ThreadMap: No supported platform detected on this page.');
+        return;
+    }
+
+    // Pass the platform adapter to the observer module
+    setObserverPlatform(currentPlatform);
 
     // Load settings first, then initialize
     loadSettings().then(() => {
         // Check if extension is enabled
         if (!getSetting('enabled')) return;
 
-        // Wait for ChatGPT to finish initial render
+        // Wait for the platform to finish initial render
         setTimeout(() => {
             _tryInit(0);
         }, INIT_DELAY_MS);
@@ -107,15 +122,16 @@ function main() {
 
 /**
  * Attempts to initialize the TOC. Retries if the chat container
- * isn't ready yet (ChatGPT loads content asynchronously).
+ * isn't ready yet (platforms load content asynchronously).
  *
  * @param {number} attempt — Current retry attempt (0-based).
  */
 function _tryInit(attempt) {
     // Bail out if extension context was invalidated
     if (!_isExtensionContextValid()) return;
+    if (!currentPlatform) return;
 
-    const chatId = getChatId();
+    const chatId = currentPlatform.getChatId();
 
     if (!chatId) {
         // Not on a conversation page — clean up if previously active
@@ -124,18 +140,18 @@ function _tryInit(attempt) {
     }
 
     // Check if the conversation container has rendered
-    const messageElement = document.querySelector('[data-message-author-role]');
+    // Use the platform adapter to look for user messages
+    const messageElements = currentPlatform.getUserMessages();
 
-    if (!messageElement && attempt < MAX_INIT_RETRIES) {
+    if (messageElements.length === 0 && attempt < MAX_INIT_RETRIES) {
         // Messages haven't loaded yet — retry after a short delay
         setTimeout(() => _tryInit(attempt + 1), RETRY_INTERVAL_MS);
         return;
     }
 
-    if (!messageElement) {
+    if (messageElements.length === 0) {
         // Fallback guard to detect DOM breakage instead of silently failing
-        console.warn("ThreadMap: message structure changed");
-        console.warn("ThreadMap: ChatGPT DOM version change detected");
+        console.warn('ThreadMap: No user messages found — DOM structure may have changed for', currentPlatform.name);
         return;
     }
 
@@ -164,8 +180,8 @@ function _activate(chatId) {
     isActive = true;
     tocItemCount = 0;
 
-    // Mount the UI panel
-    createPanel();
+    // Mount the UI panel (pass platform for empty state text)
+    createPanel(currentPlatform);
 
     // Perform initial scan of existing messages
     const existingItems = scanAllUserMessages();

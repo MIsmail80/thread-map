@@ -1,5 +1,7 @@
 /**
- * utils.js — Pure utility functions for ChatGPT Auto TOC
+ * utils.js — Pure utility functions for ThreadMap
+ *
+ * Platform-agnostic helpers used by all modules.
  *
  * PRIVACY: No data leaves the browser. All processing is local.
  */
@@ -13,24 +15,6 @@ const MAX_LABEL_LENGTH = 60;
 
 /** Suffix appended when a label is truncated */
 const TRUNCATION_SUFFIX = '…';
-
-/** Regex to extract a chat ID from the URL path (e.g. /c/<uuid> or /g/<uuid>) */
-const CHAT_ID_REGEX = /\/(?:c|g)\/([a-f0-9-]+)/i;
-
-// ──────────────────────────────────────────────
-// Chat ID Extraction
-// ──────────────────────────────────────────────
-
-/**
- * Extracts the chat ID from the current URL.
- * ChatGPT URLs follow the pattern: /c/<uuid> or /g/<uuid>
- *
- * @returns {string|null} The chat UUID, or null if not on a conversation page.
- */
-function getChatId() {
-  const match = window.location.pathname.match(CHAT_ID_REGEX);
-  return match ? match[1] : null;
-}
 
 // ──────────────────────────────────────────────
 // Text Extraction
@@ -93,6 +77,28 @@ function trimLabel(text, max) {
 }
 
 // ──────────────────────────────────────────────
+// Hashing
+// ──────────────────────────────────────────────
+
+/**
+ * Simple string hash for generating synthetic IDs.
+ * Not cryptographic — just needs to be deterministic and fast.
+ * Used by platform adapters as a fallback for message ID generation.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+// ──────────────────────────────────────────────
 // Debounce
 // ──────────────────────────────────────────────
 
@@ -124,11 +130,15 @@ const LTR_CHAR_REGEX_GLOBAL = /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/g;
 
 /**
  * Detects the dominant text direction of all user messages on the page.
+ * Uses the platform adapter to get user messages (platform-agnostic).
  *
  * @returns {'rtl'|'ltr'} The dominant direction.
  */
 function detectTextDirection() {
-  const els = document.querySelectorAll('[data-message-author-role="user"]');
+  // Get user messages via the current platform adapter
+  const platform = typeof detectPlatform === 'function' ? detectPlatform() : null;
+  const els = platform ? platform.getUserMessages() : [];
+
   let rtl = 0, ltr = 0;
 
   for (const el of els) {
