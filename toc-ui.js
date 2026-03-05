@@ -99,7 +99,13 @@ let ltrBtnElement = null;
 /** @type {HTMLElement|null} RTL direction button */
 let rtlBtnElement = null;
 
-/** @type {HTMLElement|null} Settings overlay */
+/** @type {HTMLElement|null} Container holding all the sliding pages */
+let pagesContainerElement = null;
+
+/** @type {HTMLElement|null} The main list page container */
+let mainPageElement = null;
+
+/** @type {HTMLElement|null} Settings overlay page */
 let settingsOverlayElement = null;
 
 /** @type {HTMLElement|null} Settings gear button */
@@ -263,6 +269,8 @@ function destroyPanel() {
     searchClearBtnElement = null;
     ltrBtnElement = null;
     rtlBtnElement = null;
+    pagesContainerElement = null;
+    mainPageElement = null;
     settingsOverlayElement = null;
     settingsBtnElement = null;
     _currentPanelPlatform = null;
@@ -459,6 +467,17 @@ function _buildPanel() {
         _openSettingsOverlay();
     });
 
+    // ── PAGE SYSTEM ──────────────────────────────────
+    // Container for all sliding pages
+    pagesContainerElement = document.createElement('div');
+    pagesContainerElement.className = 'toc-pages-container';
+
+    // Main TOC list page
+    mainPageElement = document.createElement('div');
+    mainPageElement.className = 'toc-page active'; // active by default
+    mainPageElement.id = 'toc-page-main';
+    // ──────────────────────────────────────────────
+
     // Toolbar (below header) — holds direction toggle, refresh & settings
     const toolbar = document.createElement('div');
     toolbar.className = 'toc-toolbar';
@@ -470,11 +489,13 @@ function _buildPanel() {
     toolbarRight.appendChild(refreshBtn);
     toolbarRight.appendChild(settingsBtnElement);
     toolbar.appendChild(toolbarRight);
-    panelElement.appendChild(toolbar);
+
+    // Add toolbar to MAIN PAGE
+    mainPageElement.appendChild(toolbar);
 
     // Search field
     _buildSearchField();
-    panelElement.appendChild(searchContainerElement);
+    mainPageElement.appendChild(searchContainerElement);
 
     // "Contents" section label — fixed above the scrollable list
     const sectionHeader = document.createElement('div');
@@ -492,8 +513,8 @@ function _buildPanel() {
     sectionHeader.appendChild(sectionLabel);
     sectionHeader.appendChild(progressIndicatorElement);
 
-    // Append section header directly to panel (not inside scrollable container)
-    panelElement.appendChild(sectionHeader);
+    // Append section header to MAIN PAGE
+    mainPageElement.appendChild(sectionHeader);
 
     // Scrollable list container (section header is NOT inside here)
     listContainerElement = document.createElement('div');
@@ -522,11 +543,19 @@ function _buildPanel() {
     listContainerElement.appendChild(tocListElement);
     listContainerElement.appendChild(emptyStateElement);
     listContainerElement.appendChild(searchNoResultsElement);
-    panelElement.appendChild(listContainerElement);
 
-    // Build settings overlay (hidden by default)
+    // Append list container to MAIN PAGE
+    mainPageElement.appendChild(listContainerElement);
+
+    // Build settings page overlay
     _buildSettingsOverlay();
-    panelElement.appendChild(settingsOverlayElement);
+
+    // Append pages to the pages container
+    pagesContainerElement.appendChild(mainPageElement);
+    pagesContainerElement.appendChild(settingsOverlayElement);
+
+    // Append the pages container to the main panel element
+    panelElement.appendChild(pagesContainerElement);
 
     shadowRoot.appendChild(panelElement);
 }
@@ -1158,7 +1187,8 @@ function _applyPanelWidth(width) {
  */
 function _buildSettingsOverlay() {
     settingsOverlayElement = document.createElement('div');
-    settingsOverlayElement.className = 'toc-settings-overlay';
+    settingsOverlayElement.className = 'toc-page';
+    settingsOverlayElement.id = 'toc-page-settings';
 
     // Settings header with back button
     const header = document.createElement('div');
@@ -1415,19 +1445,50 @@ function _handleSettingChange(key, value) {
 }
 
 /**
- * Opens the settings overlay, hiding the TOC list.
+ * Utility function to handle page navigation transitions.
+ * Supports sliding left/right logic generic for pages.
+ * @param {HTMLElement} fromPage The page we are leaving
+ * @param {HTMLElement} toPage The page we are entering
  */
-function _openSettingsOverlay() {
-    if (settingsOverlayElement) settingsOverlayElement.classList.add('open');
-    if (listContainerElement) listContainerElement.style.display = 'none';
-    if (searchContainerElement) searchContainerElement.style.display = 'none';
+function _navigateToPage(fromPage, toPage) {
+    if (!fromPage || !toPage) return;
+
+    // Set class to cause the 'from' page to slide left and fade
+    fromPage.classList.remove('active');
+    fromPage.classList.add('previous');
+
+    // Set class to cause the 'to' page to center
+    toPage.classList.remove('previous');
+    toPage.classList.add('active');
 }
 
 /**
- * Closes the settings overlay, restoring the TOC list.
+ * Utility to go backward in page navigation (slides right).
+ * @param {HTMLElement} fromPage The current deeper page
+ * @param {HTMLElement} toPage The parent page sliding back into view
+ */
+function _navigateBackToPage(fromPage, toPage) {
+    if (!fromPage || !toPage) return;
+
+    // Reset the deeper page back to its right-side initial state
+    fromPage.classList.remove('active');
+    fromPage.classList.remove('previous');
+
+    // Bring the parent page from 'previous' state back to center 'active'
+    toPage.classList.remove('previous');
+    toPage.classList.add('active');
+}
+
+/**
+ * Opens the settings overlay, smoothly transitioning away from TOC list.
+ */
+function _openSettingsOverlay() {
+    _navigateToPage(mainPageElement, settingsOverlayElement);
+}
+
+/**
+ * Closes the settings overlay, transitioning back to the TOC list.
  */
 function _closeSettingsOverlay() {
-    if (settingsOverlayElement) settingsOverlayElement.classList.remove('open');
-    if (listContainerElement) listContainerElement.style.display = '';
-    if (searchContainerElement) searchContainerElement.style.display = '';
+    _navigateBackToPage(settingsOverlayElement, mainPageElement);
 }

@@ -719,17 +719,43 @@
 
 /* ──────────────────────────────────────────────
    Settings Overlay
+   Pages Navigation System
    ────────────────────────────────────────────── */
 
-.toc-settings-overlay {
-  display: none;
-  flex-direction: column;
+.toc-pages-container {
+  display: flex;
   flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.toc-page {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
   overflow: hidden;
 }
 
-.toc-settings-overlay.open {
-  display: flex;
+.toc-page.active {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.toc-page.previous {
+  transform: translateX(-20%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .toc-settings-header {
