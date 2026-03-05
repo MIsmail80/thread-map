@@ -476,6 +476,7 @@ function _buildPanel() {
     // "Contents" section label above the list
     const sectionHeader = document.createElement('div');
     sectionHeader.className = 'toc-section-header';
+    sectionHeader.setAttribute('dir', 'ltr');
 
     const sectionLabel = document.createElement('span');
     sectionLabel.className = 'toc-section-label';
@@ -889,15 +890,26 @@ function _updateActiveHighlight() {
     let bestTarget = null;
 
     if (currentlyIntersecting.size === 0) {
-        // Default to the last message if nothing is intersecting yet
-        // (e.g. chat just opened and it automatically scrolled to the bottom input box)
         const allTargets = Array.from(messageToTOCItemMap.keys());
-        if (allTargets.length > 0) {
-            bestTarget = allTargets[allTargets.length - 1];
-        } else {
+        if (allTargets.length === 0) {
             if (progressIndicatorElement) progressIndicatorElement.textContent = '';
             return;
         }
+
+        // We are likely scrolling between prompts (e.g. reading a long response).
+        // Find the last prompt that is ABOVE the current viewport, since that's the response we're in.
+        const HEADER_OFFSET = 60; // Estimated ChatGPT sticky header height
+        let foundTarget = null;
+        for (let i = allTargets.length - 1; i >= 0; i--) {
+            const rect = allTargets[i].getBoundingClientRect();
+            if (rect.top <= HEADER_OFFSET + 100) {
+                foundTarget = allTargets[i];
+                break;
+            }
+        }
+
+        // If we scrolled all the way up past the very first prompt, default to the first prompt
+        bestTarget = foundTarget || allTargets[0];
     } else {
         // Evaluate the most relevant visible element
         let sortedTargets = Array.from(currentlyIntersecting).sort((a, b) => {

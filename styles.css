@@ -429,6 +429,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px 4px;
+  direction: ltr;
 }
 
 .toc-section-label {
@@ -660,9 +661,7 @@
    the user selects RTL direction.
    ────────────────────────────────────────────── */
 
-.toc-list-container[dir="rtl"] .toc-section-label {
-  text-align: right;
-}
+
 
 .toc-list-container[dir="rtl"] .toc-item-btn {
   text-align: right;
