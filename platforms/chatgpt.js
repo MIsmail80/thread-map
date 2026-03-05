@@ -99,10 +99,6 @@ window.ThreadMapPlatforms.chatgpt = {
                 break;
             }
 
-            if (current.parentElement && current.parentElement.tagName !== 'MAIN') {
-                candidate = current;
-            }
-
             current = current.parentElement;
             depth++;
         }

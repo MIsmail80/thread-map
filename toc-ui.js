@@ -627,16 +627,21 @@ function _buildSearchField() {
         _filterTOCItems(query);
     });
 
+    // Prevent host page from stealing focus when typing in the search box
+    // (Crucial for sites like Claude that aggressively capture keyboard input)
+    const stopPropagationFn = (e) => e.stopPropagation();
     searchInputElement.addEventListener('keydown', (e) => {
+        e.stopPropagation(); // Stop all keydowns from reaching the host page
         if (e.key === 'Escape') {
             if (searchInputElement.value.length > 0) {
                 searchInputElement.value = '';
                 searchClearBtnElement.style.display = 'none';
                 _filterTOCItems('');
-                e.stopPropagation();
             }
         }
     });
+    searchInputElement.addEventListener('keyup', stopPropagationFn);
+    searchInputElement.addEventListener('keypress', stopPropagationFn);
 
     searchContainerElement.appendChild(searchIcon);
     searchContainerElement.appendChild(searchInputElement);

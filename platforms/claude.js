@@ -120,19 +120,14 @@ window.ThreadMapPlatforms.claude = {
         while (current && depth < maxDepth) {
             // Look for Claude conversation containers
             if (
-                current.getAttribute('data-testid')?.includes('conversation') ||
                 current.getAttribute('data-is-user-message') === 'true' ||
-                current.classList?.contains('conversation-row') ||
+                current.classList?.contains('font-user-message') ||
                 current.classList?.contains('message-row') ||
                 current.getAttribute('data-role') === 'user' ||
                 current.getAttribute('data-sender') === 'human'
             ) {
                 candidate = current;
                 break;
-            }
-
-            if (current.parentElement && current.parentElement.tagName !== 'MAIN') {
-                candidate = current;
             }
 
             current = current.parentElement;
