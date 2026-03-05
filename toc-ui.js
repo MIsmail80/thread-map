@@ -469,11 +469,7 @@ function _buildPanel() {
     _buildSearchField();
     panelElement.appendChild(searchContainerElement);
 
-    // Scrollable list container
-    listContainerElement = document.createElement('div');
-    listContainerElement.className = 'toc-list-container';
-
-    // "Contents" section label above the list
+    // "Contents" section label — fixed above the scrollable list
     const sectionHeader = document.createElement('div');
     sectionHeader.className = 'toc-section-header';
     sectionHeader.setAttribute('dir', 'ltr');
@@ -488,6 +484,13 @@ function _buildPanel() {
 
     sectionHeader.appendChild(sectionLabel);
     sectionHeader.appendChild(progressIndicatorElement);
+
+    // Append section header directly to panel (not inside scrollable container)
+    panelElement.appendChild(sectionHeader);
+
+    // Scrollable list container (section header is NOT inside here)
+    listContainerElement = document.createElement('div');
+    listContainerElement.className = 'toc-list-container';
 
     tocListElement = document.createElement('ol');
     tocListElement.className = 'toc-list';
@@ -506,7 +509,6 @@ function _buildPanel() {
     searchNoResultsElement.textContent = 'No matching prompts.';
     searchNoResultsElement.style.display = 'none';
 
-    listContainerElement.appendChild(sectionHeader);
     listContainerElement.appendChild(tocListElement);
     listContainerElement.appendChild(emptyStateElement);
     listContainerElement.appendChild(searchNoResultsElement);
