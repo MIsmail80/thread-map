@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thread Map — Settings</title>
+  <link rel="icon" type="image/png" href="icons/icon-32.png">
+  <style>
+    /* ─── Reset & Base ─── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    /* ─── Light Theme ─── */
+    body {
+      background: #f4f5f7;
+      color: #1a1a1a;
+    }
+
+    /* ─── Dark Theme ─── */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: #1a1a2e;
+        color: #e4e4e7;
+      }
+
+      .settings-card {
+        background: rgba(30, 30, 46, 0.85) !important;
+        border-color: rgba(46, 46, 62, 0.6) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+      }
+
+      .settings-header {
+        border-color: rgba(46, 46, 62, 0.6) !important;
+      }
+
+      .setting-row {
+        border-color: rgba(46, 46, 62, 0.4) !important;
+      }
+
+      .setting-row:hover {
+        background: rgba(42, 42, 58, 0.5) !important;
+      }
+
+      .setting-desc {
+        color: #9ca3af !important;
+      }
+
+      .toc-select {
+        background-color: rgba(42, 42, 58, 0.6) !important;
+        border-color: rgba(46, 46, 62, 0.6) !important;
+        color: #e4e4e7 !important;
+      }
+
+      .footer-text {
+        color: #6b7280 !important;
+      }
+    }
+
+    /* ─── Card Container ─── */
+    .settings-card {
+      width: 100%;
+      max-width: 480px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(229, 231, 235, 0.6);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+    }
+
+    /* ─── Header ─── */
+    .settings-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(229, 231, 235, 0.6);
+    }
+
+    .settings-logo {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+    }
+
+    .settings-header-text h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .settings-header-text p {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    /* ─── Setting Rows ─── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      gap: 16px;
+      border-bottom: 1px solid rgba(229, 231, 235, 0.3);
+      transition: background 0.15s ease;
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-row:hover {
+      background: rgba(243, 244, 246, 0.6);
+    }
+
+    .setting-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .setting-name {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .setting-desc {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.3;
+      margin-top: 3px;
+    }
+
+    /* ─── Toggle Switch ─── */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #d1d5db;
+      border-radius: 22px;
+      transition: background 0.2s ease;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 2px;
+      bottom: 2px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch input:checked+.toggle-slider {
+      background: #6366f1;
+    }
+
+    .toggle-switch input:checked+.toggle-slider::before {
+      transform: translateX(18px);
+    }
+
+    /* ─── Select Dropdown ─── */
+    .toc-select {
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 6px 28px 6px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      color: #1a1a1a;
+      background-color: rgba(243, 244, 246, 0.8);
+      border: 1px solid rgba(229, 231, 235, 0.6);
+      border-radius: 8px;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s ease;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      flex-shrink: 0;
+    }
+
+    .toc-select:focus {
+      border-color: #6366f1;
+    }
+
+    /* ─── Footer ─── */
+    .footer-text {
+      text-align: center;
+      padding: 16px;
+      font-size: 11px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="settings-card">
+    <div class="settings-header">
+      <img src="icons/icon-32.png" alt="Thread Map" class="settings-logo">
+      <div class="settings-header-text">
+        <h1>Thread Map</h1>
+        <p>Settings</p>
+      </div>
+    </div>
+
+    <!-- 1. Enable -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Enable Thread Map</div>
+        <div class="setting-desc">Master on/off switch</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="setting-enabled">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- 2. Highlight -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Scroll highlight</div>
+        <div class="setting-desc">Highlight animation when navigating</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="setting-highlightOnScroll">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- 3. Theme -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Theme mode</div>
+      </div>
+      <select class="toc-select" id="setting-themeMode">
+        <option value="auto">Auto</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+
+    <!-- 4. Direction -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Auto-detect direction</div>
+        <div class="setting-desc">Detect RTL/LTR from messages</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="setting-autoDetectDirection">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- 5. Label length -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Label max length</div>
+      </div>
+      <select class="toc-select" id="setting-labelMaxLength">
+        <option value="30">30 chars</option>
+        <option value="60">60 chars</option>
+        <option value="90">90 chars</option>
+        <option value="120">120 chars</option>
+      </select>
+    </div>
+
+    <!-- 6. Auto-open -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Auto-open panel</div>
+        <div class="setting-desc">Open panel on page load</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="setting-autoOpenPanel">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- 7. Position -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Panel position</div>
+      </div>
+      <select class="toc-select" id="setting-panelPosition">
+        <option value="right">Right</option>
+        <option value="left">Left</option>
+      </select>
+    </div>
+
+    <!-- 8. Panel width -->
+    <div class="setting-row">
+      <div class="setting-info">
+        <div class="setting-name">Panel width</div>
+      </div>
+      <select class="toc-select" id="setting-panelWidth">
+        <option value="240">240px</option>
+        <option value="280">280px</option>
+        <option value="320">320px</option>
+        <option value="360">360px</option>
+      </select>
+    </div>
+
+    <div class="footer-text">
+      <strong>Pro Tip:</strong> Press <code>Alt + T</code> to toggle the Thread Map panel at any time.<br><br>
+      Changes save automatically<br><br>
+      <span id="version-display" style="opacity: 0.7; font-size: 10px;"></span>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+
+</html>

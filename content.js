@@ -1,11 +1,14 @@
 /**
- * content.js — Entry point for ChatGPT Auto TOC
+ * content.js — Entry point for ThreadMap
  *
  * Orchestrates initialization, teardown, and lifecycle management.
  * Delegates all logic to specialized modules:
- *   - utils.js:    Pure helpers (chat ID extraction, text trimming, debounce)
- *   - observer.js: DOM observation and SPA navigation detection
- *   - toc-ui.js:   Shadow DOM floating panel
+ *   - utils.js:              Pure helpers (text trimming, debounce, hashing)
+ *   - core/event-bus.js      Event bus for inter-module communication
+ *   - core/message-stream.js Event-based message detection
+ *   - observer/optimized-observer.js Targeted DOM observation
+ *   - toc-ui.js:             Shadow DOM floating panel
+ *   - platforms/*.js:         Platform-specific DOM adapters
  *
  * ══════════════════════════════════════════════════════════
  *  PRIVACY NOTICE
@@ -15,50 +18,15 @@
  * ══════════════════════════════════════════════════════════
  */
 
-// ──────────────────────────────────────────────
-// Constants
-// ──────────────────────────────────────────────
-
-/**
- * Delay (ms) before initializing after page load or navigation.
- * Gives ChatGPT time to render conversation messages.
- */
 const INIT_DELAY_MS = 800;
-
-/**
- * Maximum retries when waiting for messages to appear in the DOM.
- * Each retry waits RETRY_INTERVAL_MS before checking again.
- * 30 retries × 500ms = 15 seconds — handles slow page loads.
- */
 const MAX_INIT_RETRIES = 30;
-
-/** Delay (ms) between initialization retries */
 const RETRY_INTERVAL_MS = 500;
 
-// ──────────────────────────────────────────────
-// Module State
-// ──────────────────────────────────────────────
-
-/** @type {boolean} Whether the extension is currently active */
 let isActive = false;
-
-/** @type {string|null} Current chat ID */
 let currentChatId = null;
-
-/** @type {number} Running count of TOC items rendered */
 let tocItemCount = 0;
+let currentPlatform = null;
 
-// ──────────────────────────────────────────────
-// Extension Context Guard
-// ──────────────────────────────────────────────
-
-/**
- * Checks if the Chrome extension context is still valid.
- * It becomes invalid after the extension is reloaded/updated
- * while the content script is still running on a page.
- *
- * @returns {boolean}
- */
 function _isExtensionContextValid() {
     try {
         return !!(chrome && chrome.runtime && chrome.runtime.getURL);
@@ -67,70 +35,80 @@ function _isExtensionContextValid() {
     }
 }
 
-// ──────────────────────────────────────────────
-// Initialization
-// ──────────────────────────────────────────────
-
-/**
- * Main entry point. Waits for the page to settle, then initializes
- * if we're on a conversation page.
- */
 function main() {
-    // Bail out if extension context was invalidated
     if (!_isExtensionContextValid()) return;
 
-    // Wait for ChatGPT to finish initial render
-    setTimeout(() => {
-        _tryInit(0);
-    }, INIT_DELAY_MS);
+    currentPlatform = detectPlatform();
+    if (!currentPlatform) {
+        console.warn('ThreadMap: No supported platform detected on this page.');
+        return;
+    }
 
-    // Listen for SPA navigation events
+    loadSettings().then(() => {
+        if (!getSetting('enabled')) return;
+        setTimeout(() => {
+            _tryInit(0);
+        }, INIT_DELAY_MS);
+    });
+
     listenForNavigation(() => {
         _handleNavigation();
     });
+
+    onSettingsChanged((settings) => {
+        if (!settings.enabled && isActive) {
+            _teardown();
+        } else if (settings.enabled && !isActive) {
+            _tryInit(0);
+        }
+    });
+
+    // Register event bus listener for new messages
+    window.ThreadMapEventBus.on('message-added', (message) => {
+        if (!isActive) return;
+        tocItemCount++;
+        const item = {
+            id: message.id,
+            label: trimLabel(message.text),
+            element: message.element
+        };
+        // Use addTOCItem for incremental updates
+        if (typeof addTOCItem === 'function') {
+            addTOCItem(item, tocItemCount);
+        }
+    });
 }
 
-/**
- * Attempts to initialize the TOC. Retries if the chat container
- * isn't ready yet (ChatGPT loads content asynchronously).
- *
- * @param {number} attempt — Current retry attempt (0-based).
- */
 function _tryInit(attempt) {
-    // Bail out if extension context was invalidated
     if (!_isExtensionContextValid()) return;
+    if (!currentPlatform) return;
 
-    const chatId = getChatId();
+    const chatId = currentPlatform.getChatId();
 
     if (!chatId) {
-        // Not on a conversation page — clean up if previously active
         _teardown();
         return;
     }
 
-    // Check if the conversation container has rendered
-    const hasMessages = document.querySelector('[data-message-author-role]');
+    const messageElements = currentPlatform.getUserMessages();
 
-    if (!hasMessages && attempt < MAX_INIT_RETRIES) {
-        // Messages haven't loaded yet — retry after a short delay
+    if (messageElements.length === 0 && attempt < MAX_INIT_RETRIES) {
         setTimeout(() => _tryInit(attempt + 1), RETRY_INTERVAL_MS);
         return;
     }
 
-    // Initialize (or re-initialize for a new chat)
+    if (messageElements.length === 0) {
+        console.warn('ThreadMap: No user messages found — DOM structure may have changed for', currentPlatform.name);
+        return;
+    }
+
     _activate(chatId);
 }
 
-/**
- * Activates the TOC for a specific chat.
- *
- * @param {string} chatId — The chat UUID.
- */
 function _activate(chatId) {
-    // If already active for this chat, skip
     if (isActive && currentChatId === chatId) return;
+    if (!getSetting('enabled')) return;
 
-    // Teardown previous state if switching chats
     if (isActive) {
         _teardown();
     }
@@ -139,70 +117,86 @@ function _activate(chatId) {
     isActive = true;
     tocItemCount = 0;
 
-    // Mount the UI panel
-    createPanel();
+    createPanel(currentPlatform);
 
-    // Perform initial scan of existing messages
-    const existingItems = scanAllUserMessages();
-    tocItemCount = existingItems.length;
-    renderTOC(existingItems);
+    // Initialize Message Stream
+    window.ThreadMapMessageStream.init(currentPlatform);
 
-    // Start observing for new messages
-    startObserving((newItems) => {
-        for (const item of newItems) {
-            tocItemCount++;
-            addTOCItem(item, tocItemCount);
-        }
-    });
+    // Pre-clear TOC before full rescan populates it
+    renderTOC([]);
+
+    // Rescan existing messages, which will emit 'message-added' events
+    window.ThreadMapMessageStream.fullRescan();
+
+    // Start targeted observer for new messages
+    window.ThreadMapObserver.start(currentPlatform);
 }
 
-/**
- * Public function: re-scans all user messages and rebuilds the TOC.
- * Called by the refresh button in the UI panel.
- */
 function refreshTOC() {
     if (!isActive) {
-        // If not active, try full init
         _tryInit(0);
         return;
     }
 
-    // Reset seen messages and re-scan everything
-    resetSeenMessages();
-    const items = scanAllUserMessages();
-    tocItemCount = items.length;
-    renderTOC(items);
+    // Reset counts and empty TOC
+    tocItemCount = 0;
+    renderTOC([]);
+
+    // Reset stream state to clear seen messages
+    window.ThreadMapMessageStream.reset();
+
+    // Re-scan and emit everything again
+    window.ThreadMapMessageStream.fullRescan();
 }
 
-/**
- * Cleans up the extension state (observer, UI, tracking).
- */
 function _teardown() {
-    stopObserving();
+    window.ThreadMapObserver.stop();
     destroyPanel();
-    resetSeenMessages();
+
+    // Clear state
+    if (window.ThreadMapMessageStream) {
+        window.ThreadMapMessageStream.reset();
+    }
 
     isActive = false;
     currentChatId = null;
     tocItemCount = 0;
 }
 
-/**
- * Handles SPA navigation events.
- * Tears down the current state and re-initializes.
- */
 function _handleNavigation() {
     _teardown();
-
-    // Give the new page time to render
     setTimeout(() => {
         _tryInit(0);
     }, INIT_DELAY_MS);
 }
 
-// ──────────────────────────────────────────────
-// Bootstrap
-// ──────────────────────────────────────────────
+/** SPA Navigation Fallback Handlers (Extracted from old observer logic) */
+let lastKnownUrl = null;
+let urlPollTimer = null;
+let popstateHandler = null;
+const URL_POLL_INTERVAL_MS = 500;
 
-// Start the extension
+function listenForNavigation(onNavigate) {
+    lastKnownUrl = window.location.href;
+
+    popstateHandler = () => {
+        const newUrl = window.location.href;
+        if (newUrl !== lastKnownUrl) {
+            lastKnownUrl = newUrl;
+            onNavigate(newUrl);
+        }
+    };
+
+    window.addEventListener('popstate', popstateHandler);
+
+    urlPollTimer = setInterval(() => {
+        const currentUrl = window.location.href;
+        if (currentUrl !== lastKnownUrl) {
+            lastKnownUrl = currentUrl;
+            onNavigate(currentUrl);
+        }
+    }, URL_POLL_INTERVAL_MS);
+}
+
+// Bootstrap
 main();

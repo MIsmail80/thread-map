@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Thread Map",
-  "version": "1.0.0",
-  "description": "ThreadMap organizes long AI conversations into structured, navigable knowledge. Automatically generates a floating Table of Contents for AI conversations based on user prompts.",
+  "version": "1.1.0",
+  "description": "ThreadMap organizes long AI conversations into structured, navigable knowledge. Automatically generates a floating Table of Contents for AI conversations based on user prompts. Supports ChatGPT, Gemini, and Claude.",
+  "options_page": "options.html",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -15,12 +16,27 @@
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*"
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*"
       ],
       "js": [
         "utils.js",
+        "settings.js",
+        "core/event-bus.js",
+        "models/message-model.js",
+        "core/message-normalizer.js",
+        "core/message-stream.js",
+        "platforms/strategies/role-strategy.js",
+        "platforms/strategies/semantic-strategy.js",
+        "platforms/strategies/structure-strategy.js",
+        "platforms/platform-capabilities.js",
+        "platforms/chatgpt.js",
+        "platforms/gemini.js",
+        "platforms/claude.js",
+        "platforms/platform-detector.js",
         "toc-ui.js",
-        "observer.js",
+        "observer/optimized-observer.js",
         "content.js"
       ],
       "run_at": "document_idle"
@@ -34,7 +50,9 @@
       ],
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.openai.com/*"
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*"
       ]
     }
   ],

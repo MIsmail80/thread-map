@@ -5,7 +5,9 @@
  *   - Watch for new user messages added to the DOM
  *   - Track seen message IDs to prevent duplicates
  *   - Debounce mutation callbacks for performance
- *   - Detect SPA route changes (ChatGPT uses client-side navigation)
+ *   - Detect SPA route changes (all platforms use client-side navigation)
+ *
+ * Platform-specific DOM logic is delegated to platform adapters.
  *
  * PRIVACY: No data leaves the browser. All processing is local.
  */
@@ -19,13 +21,6 @@ const OBSERVER_DEBOUNCE_MS = 150;
 
 /** Interval (ms) to poll for URL changes (SPA fallback) */
 const URL_POLL_INTERVAL_MS = 500;
-
-/**
- * Primary selector for user messages.
- * ChatGPT annotates every message with a data attribute indicating the author role.
- * This is the most stable selector available — far more reliable than class names.
- */
-const USER_MESSAGE_SELECTOR = '[data-message-author-role="user"]';
 
 // ──────────────────────────────────────────────
 // Module State
@@ -46,6 +41,23 @@ let urlPollTimer = null;
 /** @type {Function|null} Bound popstate handler for cleanup */
 let popstateHandler = null;
 
+/** @type {Object|null} Current platform adapter — set by content.js */
+let _platform = null;
+
+// ──────────────────────────────────────────────
+// Platform Adapter
+// ──────────────────────────────────────────────
+
+/**
+ * Sets the platform adapter for the observer to use.
+ * Must be called before scanAllUserMessages() or startObserving().
+ *
+ * @param {Object} platform — The platform adapter object.
+ */
+function setObserverPlatform(platform) {
+    _platform = platform;
+}
+
 // ──────────────────────────────────────────────
 // Message Scanning
 // ──────────────────────────────────────────────
@@ -58,8 +70,10 @@ let popstateHandler = null;
  *   Array of new TOC items found.
  */
 function scanAllUserMessages() {
+    if (!_platform) return [];
+
     const items = [];
-    const messageElements = document.querySelectorAll(USER_MESSAGE_SELECTOR);
+    const messageElements = _platform.getUserMessages();
 
     for (const el of messageElements) {
         const item = _processMessageElement(el);
@@ -79,6 +93,9 @@ function scanAllUserMessages() {
  * @returns {Array<{id: string, label: string, element: HTMLElement}>}
  */
 function _scanAddedNodes(addedNodes) {
+    if (!_platform) return [];
+
+    const selector = _platform.getUserMessageSelector();
     const items = [];
 
     for (const node of addedNodes) {
@@ -86,14 +103,14 @@ function _scanAddedNodes(addedNodes) {
         if (node.nodeType !== Node.ELEMENT_NODE) continue;
 
         // Check if the added node itself is a user message
-        if (node.matches && node.matches(USER_MESSAGE_SELECTOR)) {
+        if (node.matches && node.matches(selector)) {
             const item = _processMessageElement(node);
             if (item) items.push(item);
         }
 
         // Check descendants of the added node
         if (node.querySelectorAll) {
-            const descendants = node.querySelectorAll(USER_MESSAGE_SELECTOR);
+            const descendants = node.querySelectorAll(selector);
             for (const desc of descendants) {
                 const item = _processMessageElement(desc);
                 if (item) items.push(item);
@@ -112,119 +129,30 @@ function _scanAddedNodes(addedNodes) {
  * @returns {{id: string, label: string, element: HTMLElement}|null}
  */
 function _processMessageElement(el) {
-    // Find the message ID from the element or its parent container
-    const messageId = _getMessageId(el);
+    if (!_platform) return null;
+
+    // Find the message ID using the platform adapter
+    const messageId = _platform.getMessageId(el);
     if (!messageId) return null;
 
     // Skip already-processed messages (deduplication)
     if (seenMessageIds.has(messageId)) return null;
 
-    // Extract text
-    const firstLine = extractFirstLine(el);
+    // Extract text using the platform adapter
+    const firstLine = _platform.getMessageText(el);
     if (!firstLine) return null;
 
     // Mark as seen
     seenMessageIds.add(messageId);
 
-    // Find the scrollable container (the outermost message wrapper)
-    // We scroll to the parent article/div that contains the full message turn
-    const scrollTarget = _findScrollTarget(el);
+    // Find the scrollable container using the platform adapter
+    const scrollTarget = _platform.getScrollTarget(el);
 
     return {
         id: messageId,
         label: trimLabel(firstLine),
         element: scrollTarget || el,
     };
-}
-
-/**
- * Extracts the message ID from a message element.
- *
- * Strategy:
- *   1. Check for `data-message-id` on the element itself.
- *   2. Walk up the DOM to find the nearest ancestor with `data-message-id`.
- *   3. Fallback: generate a synthetic ID from position.
- *
- * @param {HTMLElement} el
- * @returns {string|null}
- */
-function _getMessageId(el) {
-    // Direct attribute
-    if (el.getAttribute('data-message-id')) {
-        return el.getAttribute('data-message-id');
-    }
-
-    // Walk up to find a parent with the attribute
-    let parent = el.parentElement;
-    const maxDepth = 10; // Avoid walking too far up
-    let depth = 0;
-
-    while (parent && depth < maxDepth) {
-        if (parent.getAttribute('data-message-id')) {
-            return parent.getAttribute('data-message-id');
-        }
-        parent = parent.parentElement;
-        depth++;
-    }
-
-    // Fallback: use a combination of text content hash + index
-    // This handles edge cases where data-message-id isn't available
-    const text = el.innerText || '';
-    const hash = _simpleHash(text.slice(0, 200));
-    return `synthetic-${hash}`;
-}
-
-/**
- * Finds the best scroll target for a message element.
- * Walks up the DOM to find the outermost "turn" container.
- *
- * @param {HTMLElement} el
- * @returns {HTMLElement}
- */
-function _findScrollTarget(el) {
-    // Look for common ChatGPT turn container patterns
-    let current = el;
-    let candidate = el;
-    const maxDepth = 15;
-    let depth = 0;
-
-    while (current && depth < maxDepth) {
-        // ChatGPT wraps each turn in an article or a div with specific attributes
-        if (
-            current.tagName === 'ARTICLE' ||
-            current.getAttribute('data-testid')?.includes('conversation-turn')
-        ) {
-            candidate = current;
-            break;
-        }
-
-        // Generic: if the parent still contains only this message turn, keep going
-        if (current.parentElement && current.parentElement.tagName !== 'MAIN') {
-            candidate = current;
-        }
-
-        current = current.parentElement;
-        depth++;
-    }
-
-    return candidate;
-}
-
-/**
- * Simple string hash for generating synthetic IDs.
- * Not cryptographic — just needs to be deterministic and fast.
- *
- * @param {string} str
- * @returns {string}
- */
-function _simpleHash(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36);
 }
 
 // ──────────────────────────────────────────────
@@ -236,8 +164,8 @@ function _simpleHash(str) {
  *
  * Strategy:
  *   Instead of trying to inspect only addedNodes (which misses messages
- *   where ChatGPT adds a container first, then sets data-message-author-role
- *   as an attribute later), we do a full document re-scan on any mutation.
+ *   where the platform adds a container first, then sets role attributes
+ *   later), we do a full document re-scan on any mutation.
  *   The seenMessageIds Set prevents duplicates, and the debounce (300ms)
  *   prevents performance issues even in long chats.
  *
@@ -245,6 +173,7 @@ function _simpleHash(str) {
  */
 function startObserving(onNewItems) {
     if (mutationObserver) return; // Already observing
+    if (!_platform) return;
 
     // Debounced full re-scan: on any DOM change, look for unseen user messages 
     const debouncedRescan = debounce(() => {
@@ -261,10 +190,10 @@ function startObserving(onNewItems) {
     mutationObserver.observe(document.body, {
         childList: true,
         subtree: true,
-        // Also watch for attribute changes — ChatGPT may set
-        // data-message-author-role after the node is already in the DOM
+        // Also watch for attribute changes — platforms may set
+        // role/ID attributes after the node is already in the DOM
         attributes: true,
-        attributeFilter: ['data-message-author-role', 'data-message-id'],
+        attributeFilter: _platform.getObservedAttributes(),
     });
 }
 
@@ -283,7 +212,7 @@ function stopObserving() {
 // ──────────────────────────────────────────────
 
 /**
- * Listens for SPA route changes (ChatGPT uses client-side navigation).
+ * Listens for SPA route changes (all platforms use client-side navigation).
  *
  * Strategy:
  *   1. Listen to `popstate` events (browser back/forward).

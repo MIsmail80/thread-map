@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+    <div class="conversation">
+        <!-- User Message -->
+        <div class="message-container user-message">
+            <div class="message-content">
+                <p>Could you write a simple Python script to fetch data from an API?</p>
+            </div>
+        </div>
+
+        <!-- Assistant Message -->
+        <div class="message-container assistant-message">
+            <div class="message-content">
+                <p>Certainly! Here is a simple Python script using the <code>requests</code> library.</p>
+                <pre><code class="language-python">import requests
+response = requests.get('https://api.example.com/data')
+print(response.json())</code></pre>
+            </div>
+        </div>
+
+        <!-- Long User Message -->
+        <div class="message-container user-message">
+            <div class="message-content">
+                <p>1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890
+                    1234567890</p>
+            </div>
+        </div>
+
+        <!-- Edge case: Empty message line before real text -->
+        <div class="message-container user-message">
+            <div class="message-content">
+                <p></p>
+                <p> </p>
+                <p>Now explain it to me.</p>
+            </div>
+        </div>
+
+        <!-- RTL Text -->
+        <div class="message-container user-message">
+            <div class="message-content">
+                <p>مرحبا كيف حالك؟</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

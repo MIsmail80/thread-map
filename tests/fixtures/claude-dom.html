@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<body>
+    <div class="conversation">
+        <!-- User Message -->
+        <div class="font-user-message">
+            <div class="claude-message-content">
+                <p>How do I test a React component?</p>
+            </div>
+        </div>
+
+        <!-- Assistant Message -->
+        <div class="font-claude-message">
+            <div class="claude-message-content">
+                <p>Here's how you can test a React component using React Testing Library.</p>
+                <pre><code class="language-javascript">import { render, screen } from '@testing-library/react';
+import MyComponent from './MyComponent';
+
+test('renders correctly', () => {
+  render(&lt;MyComponent /&gt;);
+  expect(screen.getByText('Hello')).toBeInTheDocument();
+});</code></pre>
+            </div>
+        </div>
+
+        <!-- User Message with newlines and structure -->
+        <div class="font-user-message">
+            <div class="claude-message-content">
+                <h3>That worked!</h3>
+                <p>Next question:</p>
+                <p>What about testing hooks?</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

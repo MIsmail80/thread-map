@@ -1,5 +1,7 @@
 /**
- * utils.js — Pure utility functions for ChatGPT Auto TOC
+ * utils.js — Pure utility functions for ThreadMap
+ *
+ * Platform-agnostic helpers used by all modules.
  *
  * PRIVACY: No data leaves the browser. All processing is local.
  */
@@ -13,24 +15,6 @@ const MAX_LABEL_LENGTH = 60;
 
 /** Suffix appended when a label is truncated */
 const TRUNCATION_SUFFIX = '…';
-
-/** Regex to extract a chat ID from the URL path (e.g. /c/<uuid> or /g/<uuid>) */
-const CHAT_ID_REGEX = /\/(?:c|g)\/([a-f0-9-]+)/i;
-
-// ──────────────────────────────────────────────
-// Chat ID Extraction
-// ──────────────────────────────────────────────
-
-/**
- * Extracts the chat ID from the current URL.
- * ChatGPT URLs follow the pattern: /c/<uuid> or /g/<uuid>
- *
- * @returns {string|null} The chat UUID, or null if not on a conversation page.
- */
-function getChatId() {
-  const match = window.location.pathname.match(CHAT_ID_REGEX);
-  return match ? match[1] : null;
-}
 
 // ──────────────────────────────────────────────
 // Text Extraction
@@ -51,16 +35,42 @@ function getChatId() {
 function extractFirstLine(element) {
   if (!element) return null;
 
-  // innerText respects CSS visibility and produces layout-aware text
-  const text = element.innerText;
+  // Clone the node so we can destructively remove hidden elements without affecting the real DOM
+  const clone = element.cloneNode(true);
+
+  // Remove common visually-hidden / screen-reader-only elements (crucial for Gemini's "You said")
+  const hiddenSelectors = ['.sr-only', '.visually-hidden', '.v-off-screen', '[aria-hidden="true"]'];
+  hiddenSelectors.forEach(sel => {
+    clone.querySelectorAll(sel).forEach(n => n.remove());
+  });
+
+  // Explicitly remove <script> and <style> tags. Since clone is unattached, innerText doesn't natively hide them.
+  clone.querySelectorAll('script, style, noscript, svg').forEach(n => n.remove());
+
+  // innerText on an unattached DOM node might not fully compute CSS visibility,
+  // but removing the specific hidden classes manually covers most cases like Gemini.
+  const text = clone.innerText || clone.textContent || '';
   if (!text) return null;
 
   const lines = text.split('\n');
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.length > 0) {
-      return trimmed;
+    let trimmed = line.trim();
+    if (trimmed.length > 0 && trimmed.toLowerCase() !== 'you said') {
+      // For Gemini: forcefully strip leading "You said" or "You said:" just in case
+      // the DOM cleanup didn't catch it
+      const lower = trimmed.toLowerCase();
+      if (lower.startsWith('you said:')) {
+        trimmed = trimmed.substring(9).trim();
+      } else if (lower.startsWith('you said\n') || lower.startsWith('you said ')) {
+        trimmed = trimmed.substring(8).trim();
+      } else if (lower === 'you said') {
+        continue;
+      }
+
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
     }
   }
 
@@ -78,7 +88,11 @@ function extractFirstLine(element) {
  * @param {number} [max=MAX_LABEL_LENGTH] — Maximum allowed characters.
  * @returns {string} The trimmed label.
  */
-function trimLabel(text, max = MAX_LABEL_LENGTH) {
+function trimLabel(text, max) {
+  // Use setting if available, otherwise fall back to constant
+  if (max === undefined) {
+    max = (typeof getSetting === 'function') ? getSetting('labelMaxLength') : MAX_LABEL_LENGTH;
+  }
   if (!text) return '';
 
   if (text.length <= max) {
@@ -86,6 +100,28 @@ function trimLabel(text, max = MAX_LABEL_LENGTH) {
   }
 
   return text.slice(0, max).trimEnd() + TRUNCATION_SUFFIX;
+}
+
+// ──────────────────────────────────────────────
+// Hashing
+// ──────────────────────────────────────────────
+
+/**
+ * Simple string hash for generating synthetic IDs.
+ * Not cryptographic — just needs to be deterministic and fast.
+ * Used by platform adapters as a fallback for message ID generation.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
 }
 
 // ──────────────────────────────────────────────
@@ -114,26 +150,45 @@ function debounce(fn, ms) {
 // Text Direction Detection (RTL / LTR)
 // ──────────────────────────────────────────────
 
-/** Regex matching RTL Unicode script characters */
-const RTL_CHAR_REGEX_GLOBAL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/g;
-const LTR_CHAR_REGEX_GLOBAL = /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/g;
+/** Regex matching RTL Unicode script words */
+const RTL_WORD_REGEX_GLOBAL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]+/g;
+const LTR_WORD_REGEX_GLOBAL = /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]+/g;
 
 /**
  * Detects the dominant text direction of all user messages on the page.
+ * Uses the platform adapter to get user messages (platform-agnostic).
  *
  * @returns {'rtl'|'ltr'} The dominant direction.
  */
 function detectTextDirection() {
-  const els = document.querySelectorAll('[data-message-author-role="user"]');
   let rtl = 0, ltr = 0;
 
+  // Use the new architecture's canonical message stream if available
+  if (window.ThreadMapMessageStream && typeof window.ThreadMapMessageStream.getMessages === 'function') {
+    const messages = window.ThreadMapMessageStream.getMessages();
+    for (const msg of messages) {
+      const rm = msg.text.match(RTL_WORD_REGEX_GLOBAL);
+      const lm = msg.text.match(LTR_WORD_REGEX_GLOBAL);
+      rtl += rm ? rm.length : 0;
+      ltr += lm ? lm.length : 0;
+    }
+    return rtl > ltr ? 'rtl' : 'ltr';
+  }
+
+  // Backwards compatibility fallback
+  const platform = typeof detectPlatform === 'function' ? detectPlatform() : null;
+  const els = platform ? platform.getUserMessages() : [];
+
   for (const el of els) {
-    const text = el.innerText || '';
-    const rm = text.match(RTL_CHAR_REGEX_GLOBAL);
-    const lm = text.match(LTR_CHAR_REGEX_GLOBAL);
+    // Try extractFirstLine for clean text, fallback to raw textContent for shadow DOM bypass
+    const text = extractFirstLine(el) || el.textContent || '';
+    const rm = text.match(RTL_WORD_REGEX_GLOBAL);
+    const lm = text.match(LTR_WORD_REGEX_GLOBAL);
     rtl += rm ? rm.length : 0;
     ltr += lm ? lm.length : 0;
   }
 
   return rtl > ltr ? 'rtl' : 'ltr';
 }
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { extractFirstLine, trimLabel, simpleHash, debounce, detectTextDirection }; }
