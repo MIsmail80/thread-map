@@ -44,6 +44,9 @@ function extractFirstLine(element) {
     clone.querySelectorAll(sel).forEach(n => n.remove());
   });
 
+  // Explicitly remove <script> and <style> tags. Since clone is unattached, innerText doesn't natively hide them.
+  clone.querySelectorAll('script, style, noscript, svg').forEach(n => n.remove());
+
   // innerText on an unattached DOM node might not fully compute CSS visibility,
   // but removing the specific hidden classes manually covers most cases like Gemini.
   const text = clone.innerText || clone.textContent || '';
@@ -147,9 +150,9 @@ function debounce(fn, ms) {
 // Text Direction Detection (RTL / LTR)
 // ──────────────────────────────────────────────
 
-/** Regex matching RTL Unicode script characters */
-const RTL_CHAR_REGEX_GLOBAL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]/g;
-const LTR_CHAR_REGEX_GLOBAL = /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/g;
+/** Regex matching RTL Unicode script words */
+const RTL_WORD_REGEX_GLOBAL = /[\u0591-\u07FF\u200F\u202B\u202E\uFB1D-\uFDFD\uFE70-\uFEFC]+/g;
+const LTR_WORD_REGEX_GLOBAL = /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]+/g;
 
 /**
  * Detects the dominant text direction of all user messages on the page.
@@ -158,16 +161,29 @@ const LTR_CHAR_REGEX_GLOBAL = /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/g;
  * @returns {'rtl'|'ltr'} The dominant direction.
  */
 function detectTextDirection() {
-  // Get user messages via the current platform adapter
+  let rtl = 0, ltr = 0;
+
+  // Use the new architecture's canonical message stream if available
+  if (window.ThreadMapMessageStream && typeof window.ThreadMapMessageStream.getMessages === 'function') {
+    const messages = window.ThreadMapMessageStream.getMessages();
+    for (const msg of messages) {
+      const rm = msg.text.match(RTL_WORD_REGEX_GLOBAL);
+      const lm = msg.text.match(LTR_WORD_REGEX_GLOBAL);
+      rtl += rm ? rm.length : 0;
+      ltr += lm ? lm.length : 0;
+    }
+    return rtl > ltr ? 'rtl' : 'ltr';
+  }
+
+  // Backwards compatibility fallback
   const platform = typeof detectPlatform === 'function' ? detectPlatform() : null;
   const els = platform ? platform.getUserMessages() : [];
 
-  let rtl = 0, ltr = 0;
-
   for (const el of els) {
-    const text = el.innerText || '';
-    const rm = text.match(RTL_CHAR_REGEX_GLOBAL);
-    const lm = text.match(LTR_CHAR_REGEX_GLOBAL);
+    // Try extractFirstLine for clean text, fallback to raw textContent for shadow DOM bypass
+    const text = extractFirstLine(el) || el.textContent || '';
+    const rm = text.match(RTL_WORD_REGEX_GLOBAL);
+    const lm = text.match(LTR_WORD_REGEX_GLOBAL);
     rtl += rm ? rm.length : 0;
     ltr += lm ? lm.length : 0;
   }

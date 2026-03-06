@@ -660,22 +660,25 @@
 /* ──────────────────────────────────────────────
    RTL Content Direction Overrides
    Applied to the list container body when
-   the user selects RTL direction.
+   the user selects RTL direction globally.
    ────────────────────────────────────────────── */
 
-
-
 .toc-list-container[dir="rtl"] .toc-item-btn {
+  /* Native RTL handles the row swap. Just align text right. */
   text-align: right;
 }
 
-.toc-list-container[dir="rtl"] .toc-item-number {
-  text-align: left;
+.toc-list-container[dir="rtl"] .toc-item-label {
+  text-align: right;
+  direction: rtl;
 }
 
-.toc-list-container[dir="rtl"] .toc-empty {
-  text-align: center;
-  direction: rtl;
+.toc-list-container[dir="rtl"] .toc-item-number {
+  text-align: right;
+}
+
+.toc-list-container[dir="rtl"] .toc-item-btn.active {
+  box-shadow: inset -3px 0 0 #6366f1;
 }
 
 /* ──────────────────────────────────────────────

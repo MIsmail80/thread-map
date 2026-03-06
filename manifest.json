@@ -23,12 +23,20 @@
       "js": [
         "utils.js",
         "settings.js",
+        "core/event-bus.js",
+        "models/message-model.js",
+        "core/message-normalizer.js",
+        "core/message-stream.js",
+        "platforms/strategies/role-strategy.js",
+        "platforms/strategies/semantic-strategy.js",
+        "platforms/strategies/structure-strategy.js",
+        "platforms/platform-capabilities.js",
         "platforms/chatgpt.js",
         "platforms/gemini.js",
         "platforms/claude.js",
         "platforms/platform-detector.js",
         "toc-ui.js",
-        "observer.js",
+        "observer/optimized-observer.js",
         "content.js"
       ],
       "run_at": "document_idle"

@@ -849,6 +849,11 @@ function addTOCItem(item, index) {
         const btn = li.querySelector('.toc-item-btn');
         if (btn) messageToTOCItemMap.set(item.element, btn);
     }
+
+    // Evaluate global list direction as new items arrive
+    if (getSetting('autoDetectDirection')) {
+        _autoDetectDirection();
+    }
 }
 
 /**
