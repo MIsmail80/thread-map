@@ -190,3 +190,5 @@ function detectTextDirection() {
 
   return rtl > ltr ? 'rtl' : 'ltr';
 }
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { extractFirstLine, trimLabel, simpleHash, debounce, detectTextDirection }; }

@@ -46,3 +46,5 @@ window.ThreadMapRoleStrategy = {
         return Array.from(new Set(results));
     }
 };
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { RoleStrategy: window.ThreadMapRoleStrategy }; }

@@ -143,3 +143,5 @@ window.ThreadMapPlatforms.gemini = {
         return 'Start asking Gemini something.';
     }
 };
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { GeminiAdapter: window.ThreadMapPlatforms.gemini }; }

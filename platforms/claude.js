@@ -131,3 +131,5 @@ window.ThreadMapPlatforms.claude = {
         return 'Start asking Claude something.';
     }
 };
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { ClaudeAdapter: window.ThreadMapPlatforms.claude }; }

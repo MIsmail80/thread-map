@@ -51,3 +51,5 @@ window.ThreadMapMessageNormalizer = {
         }
     }
 };
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { MessageNormalizer: window.ThreadMapMessageNormalizer }; }

@@ -82,3 +82,5 @@ window.ThreadMapPlatforms.chatgpt = {
         return 'Start asking ChatGPT something.';
     }
 };
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { ChatGPTAdapter: window.ThreadMapPlatforms.chatgpt }; }

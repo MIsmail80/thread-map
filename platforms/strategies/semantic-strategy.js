@@ -70,3 +70,5 @@ window.ThreadMapSemanticStrategy = {
         return results;
     }
 };
+
+if (typeof module !== "undefined" && module.exports) { module.exports = { SemanticStrategy: window.ThreadMapSemanticStrategy }; }
